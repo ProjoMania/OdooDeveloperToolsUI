@@ -544,56 +544,141 @@ def restore_database():
 
 @app.route('/databases/extend_enterprise', methods=['GET', 'POST'])
 def extend_enterprise():
-    """Extend Odoo Enterprise license expiration date"""
-    if request.method == 'POST':
-        results = []
-        # Connect to PostgreSQL
+    """Extend Odoo Enterprise license expiration date for selected databases"""
+    # Get enterprise databases for display in the GET request
+    enterprise_dbs = []
+    
+    # Connect to PostgreSQL
+    try:
+        # Get PostgreSQL connection settings directly to show in debug log
+        postgres_user = get_setting('postgres_user', 'postgres')
+        postgres_host = get_setting('postgres_host', 'localhost')
+        postgres_port = get_setting('postgres_port', '5432')
+        
+        # Debug log
+        print(f"========================USER============================")
+        print(postgres_user)
+        print(f"========================HOST============================")
+        print(postgres_host)
+        print(f"========================PORT============================")
+        print(postgres_port)
+        
         conn = get_db_connection()
         if not conn:
-            flash('Could not connect to PostgreSQL', 'danger')
-            return redirect(url_for('list_databases'))
-        
-        cursor = conn.cursor()
-        
-        # Get all databases
-        cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
-        databases = [row[0] for row in cursor.fetchall() if row[0] not in ('postgres', 'template0', 'template1')]
-        
-        enterprise_dbs = []
-        
-        # Check each database for Odoo Enterprise
-        for db_name in databases:
-            try:
-                db_conn = psycopg2.connect(dbname=db_name, user="postgres")
-                db_cursor = db_conn.cursor()
-                
-                # Check if it's an Odoo database with enterprise module
+            error_msg = 'Could not connect to PostgreSQL. Please check your database settings.'
+            flash(error_msg, 'danger')
+            logger.error(error_msg)
+            return render_template('extend_enterprise.html', enterprise_dbs=[])
+    except Exception as e:
+        error_msg = f'PostgreSQL connection error: {str(e)}'
+        flash(error_msg, 'danger')
+        logger.error(error_msg)
+        return render_template('extend_enterprise.html', enterprise_dbs=[])
+    
+    cursor = conn.cursor()
+    
+    # Get all databases
+    cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
+    databases = [row[0] for row in cursor.fetchall() if row[0] not in ('postgres', 'template0', 'template1')]
+    
+    # Check each database for Odoo Enterprise
+    for db_name in databases:
+        try:
+            # Use complete connection settings from the database
+            postgres_user = get_setting('postgres_user', 'postgres')
+            postgres_password = get_setting('postgres_password', '')
+            postgres_host = get_setting('postgres_host', 'localhost')
+            postgres_port = get_setting('postgres_port', '5432')
+            
+            # Connect with appropriate parameters based on whether password is set
+            if postgres_password:
+                db_conn = psycopg2.connect(
+                    dbname=db_name,
+                    user=postgres_user,
+                    password=postgres_password,
+                    host=postgres_host,
+                    port=postgres_port
+                )
+            else:
+                db_conn = psycopg2.connect(
+                    dbname=db_name,
+                    user=postgres_user,
+                    host=postgres_host,
+                    port=postgres_port
+                )
+            db_cursor = db_conn.cursor()
+            
+            # Check if it's an Odoo database with enterprise module
+            db_cursor.execute("""
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'ir_module_module'
+            """)
+            
+            if db_cursor.fetchone():
+                # Check for enterprise module
                 db_cursor.execute("""
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_name = 'ir_module_module'
+                    SELECT 1 FROM ir_module_module
+                    WHERE name = 'web_enterprise' AND state = 'installed'
                 """)
                 
                 if db_cursor.fetchone():
-                    # Check for enterprise module
-                    db_cursor.execute("""
-                        SELECT 1 FROM ir_module_module
-                        WHERE name = 'web_enterprise' AND state = 'installed'
-                    """)
+                    # Get current expiration date
+                    expiration_date = None
+                    try:
+                        db_cursor.execute("""
+                            SELECT value FROM ir_config_parameter
+                            WHERE key = 'database.expiration_date'
+                        """)
+                        row = db_cursor.fetchone()
+                        if row:
+                            expiration_date = row[0]
+                    except:
+                        pass
                     
-                    if db_cursor.fetchone():
-                        # This is an Enterprise database
-                        enterprise_dbs.append(db_name)
-                
-                db_cursor.close()
-                db_conn.close()
-            except:
-                # Skip databases that can't be accessed
-                pass
+                    # Add database to the list
+                    enterprise_dbs.append({
+                        'name': db_name,
+                        'expiration_date': expiration_date
+                    })
+            
+            db_cursor.close()
+            db_conn.close()
+        except Exception as e:
+            logger.error(f"Error checking database {db_name}: {str(e)}")
+            # Skip databases that can't be accessed
+            pass
+    
+    cursor.close()
+    conn.close()
+    
+    # Process POST request for extending licenses
+    if request.method == 'POST':
+        results = []
+        selected_dbs = request.form.getlist('databases')
         
-        # Extend the expiration for each enterprise database
-        for db_name in enterprise_dbs:
+        if not selected_dbs:
+            flash('No databases selected for extension', 'warning')
+            return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs)
+        
+        # Extend the expiration for each selected database
+        for db_name in selected_dbs:
             try:
-                db_conn = psycopg2.connect(dbname=db_name, user="postgres")
+                # Use the user settings for the database connection
+                if get_setting('postgres_password', ''):
+                    db_conn = psycopg2.connect(
+                        dbname=db_name,
+                        user=get_setting('postgres_user', 'postgres'),
+                        password=get_setting('postgres_password', ''),
+                        host=get_setting('postgres_host', 'localhost'),
+                        port=get_setting('postgres_port', '5432')
+                    )
+                else:
+                    db_conn = psycopg2.connect(
+                        dbname=db_name,
+                        user=get_setting('postgres_user', 'postgres'),
+                        host=get_setting('postgres_host', 'localhost'),
+                        port=get_setting('postgres_port', '5432')
+                    )
                 db_conn.autocommit = True
                 db_cursor = db_conn.cursor()
                 
