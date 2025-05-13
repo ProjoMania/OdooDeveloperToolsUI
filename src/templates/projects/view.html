@@ -262,7 +262,7 @@
             <div class="card-body p-0">
                 {% if project.tasks %}
                 <ul class="list-group list-group-flush">
-                    {% for task in project.tasks|sort(attribute='updated_at', reverse=true)|slice(0, 5) %}
+                    {% for task in project.tasks|sort(attribute='updated_at', reverse=true) %}{% if loop.index <= 5 %}
                     <li class="list-group-item">
                         <div class="d-flex justify-content-between">
                             <a href="{{ url_for('view_task', project_id=project.id, task_id=task.id) }}" class="text-decoration-none">{{ task.title }}</a>
@@ -278,7 +278,7 @@
                         </div>
                         <div class="small text-muted mt-1">Updated {{ task.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
                     </li>
-                    {% endfor %}
+                    {% endif %}{% endfor %}
                 </ul>
                 {% else %}
                 <div class="text-center p-4">
