@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
 import markdown
-from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase
+from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -48,9 +48,34 @@ os.makedirs(FILESTORE_DIR, exist_ok=True)
 # === Helper Functions ===
 
 def get_db_connection():
-    """Create a connection to PostgreSQL"""
+    """Create a connection to PostgreSQL using settings from the database"""
     try:
-        conn = psycopg2.connect(dbname="postgres", user="postgres")
+        # Get PostgreSQL connection settings from database
+        with app.app_context():
+            # Get settings with defaults if not set
+            user = get_setting('postgres_user', 'postgres')
+            password = get_setting('postgres_password', '')
+            host = get_setting('postgres_host', 'localhost')
+            port = get_setting('postgres_port', '5432')
+
+        # Build connection string based on whether password is provided
+        if password:
+            conn = psycopg2.connect(
+                dbname="postgres",
+                user=user,
+                password=password,
+                host=host,
+                port=port
+            )
+        else:
+            # Use peer authentication (no password)
+            conn = psycopg2.connect(
+                dbname="postgres",
+                user=user,
+                host=host,
+                port=port
+            )
+            
         conn.autocommit = True
         return conn
     except Exception as e:
@@ -1013,9 +1038,149 @@ def unlink_database(project_id, database_id):
         
     return redirect(url_for('view_project', project_id=project_id))
 
+# === Settings Routes ===
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    """Application settings page"""
+    # Get all settings from the database
+    all_settings = Setting.query.all()
+    settings_dict = {}
+    
+    # Convert settings to a dictionary for easy access in the template
+    for setting in all_settings:
+        settings_dict[setting.key] = setting.value
+    
+    if request.method == 'POST':
+        # Process form submission
+        settings_to_update = [
+            # PostgreSQL settings
+            ('postgres_user', request.form.get('postgres_user', 'postgres')),
+            ('postgres_password', request.form.get('postgres_password', '')),
+            ('postgres_host', request.form.get('postgres_host', 'localhost')),
+            ('postgres_port', request.form.get('postgres_port', '5432')),
+            
+            # File paths
+            ('filestore_dir', request.form.get('filestore_dir', FILESTORE_DIR)),
+            ('upload_folder', request.form.get('upload_folder', app.config['UPLOAD_FOLDER'])),
+            ('ssh_config_dir', request.form.get('ssh_config_dir', SSH_CONFIG_DIR)),
+            
+            # Application settings
+            ('default_odoo_version', request.form.get('default_odoo_version', '17.0')),
+            ('auto_backup_before_drop', 'true' if request.form.get('auto_backup_before_drop') else 'false'),
+            ('dark_mode', 'true' if request.form.get('dark_mode') else 'false')
+        ]
+        
+        # Update or create each setting in the database
+        for key, value in settings_to_update:
+            setting = Setting.query.filter_by(key=key).first()
+            if setting:
+                setting.value = value
+            else:
+                # Create new setting with appropriate description
+                description = get_setting_description(key)
+                new_setting = Setting(key=key, value=value, description=description)
+                db.session.add(new_setting)
+        
+        db.session.commit()
+        flash('Settings saved successfully', 'success')
+        return redirect(url_for('settings'))
+    
+    return render_template('settings.html', 
+                          settings=settings_dict,
+                          filestore_dir=FILESTORE_DIR,
+                          upload_folder=app.config['UPLOAD_FOLDER'],
+                          ssh_config_dir=SSH_CONFIG_DIR)
+
+@app.route('/settings/reset', methods=['GET'])
+def reset_settings():
+    """Reset all settings to their default values"""
+    # Remove all existing settings
+    Setting.query.delete()
+    db.session.commit()
+    
+    # Set default settings
+    default_settings = [
+        # PostgreSQL settings
+        ('postgres_user', 'postgres', 'Default PostgreSQL username'),
+        ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
+        ('postgres_host', 'localhost', 'PostgreSQL server hostname'),
+        ('postgres_port', '5432', 'PostgreSQL server port'),
+        
+        # File paths
+        ('filestore_dir', FILESTORE_DIR, 'Directory where Odoo filestore folders are stored'),
+        ('upload_folder', app.config['UPLOAD_FOLDER'], 'Temporary directory for file uploads'),
+        ('ssh_config_dir', SSH_CONFIG_DIR, 'Directory for SSH configuration files'),
+        
+        # Application settings
+        ('default_odoo_version', '17.0', 'Default Odoo version for new projects'),
+        ('auto_backup_before_drop', 'true', 'Create a backup before dropping a database'),
+        ('dark_mode', 'false', 'Use dark theme for the application')
+    ]
+    
+    # Create default settings
+    for key, value, description in default_settings:
+        setting = Setting(key=key, value=value, description=description)
+        db.session.add(setting)
+    
+    db.session.commit()
+    flash('Settings have been reset to default values', 'success')
+    return redirect(url_for('settings'))
+
+def get_setting_description(key):
+    """Get description for a setting key"""
+    descriptions = {
+        'postgres_user': 'Default PostgreSQL username',
+        'postgres_password': 'PostgreSQL password (empty for peer authentication)',
+        'postgres_host': 'PostgreSQL server hostname',
+        'postgres_port': 'PostgreSQL server port',
+        'filestore_dir': 'Directory where Odoo filestore folders are stored',
+        'upload_folder': 'Temporary directory for file uploads',
+        'ssh_config_dir': 'Directory for SSH configuration files',
+        'default_odoo_version': 'Default Odoo version for new projects',
+        'auto_backup_before_drop': 'Create a backup before dropping a database',
+        'dark_mode': 'Use dark theme for the application'
+    }
+    return descriptions.get(key, '')
+
+# Function to get a setting value with default fallback
+def get_setting(key, default=None):
+    """Get a setting value from the database with a default fallback"""
+    setting = Setting.query.filter_by(key=key).first()
+    if setting:
+        return setting.value
+    return default
+
 # === Run the Application ===
 if __name__ == '__main__':
     # Create database tables before running the app
     with app.app_context():
         db.create_all()
+        
+        # Initialize default settings if none exist
+        if Setting.query.count() == 0:
+            # Use the reset_settings function logic without the redirect
+            default_settings = [
+                # PostgreSQL settings
+                ('postgres_user', 'postgres', 'Default PostgreSQL username'),
+                ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
+                ('postgres_host', 'localhost', 'PostgreSQL server hostname'),
+                ('postgres_port', '5432', 'PostgreSQL server port'),
+                
+                # File paths
+                ('filestore_dir', FILESTORE_DIR, 'Directory where Odoo filestore folders are stored'),
+                ('upload_folder', app.config['UPLOAD_FOLDER'], 'Temporary directory for file uploads'),
+                ('ssh_config_dir', SSH_CONFIG_DIR, 'Directory for SSH configuration files'),
+                
+                # Application settings
+                ('default_odoo_version', '17.0', 'Default Odoo version for new projects'),
+                ('auto_backup_before_drop', 'true', 'Create a backup before dropping a database'),
+                ('dark_mode', 'false', 'Use dark theme for the application')
+            ]
+            
+            for key, value, description in default_settings:
+                setting = Setting(key=key, value=value, description=description)
+                db.session.add(setting)
+            
+            db.session.commit()
+    
     app.run(debug=True)

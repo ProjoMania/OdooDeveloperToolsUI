@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Application Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('settings') }}">
+                    <!-- PostgreSQL Settings -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-database me-2"></i>Database Connection</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="postgres_user" class="form-label">PostgreSQL Username</label>
+                                    <input type="text" class="form-control" id="postgres_user" name="postgres_user" 
+                                           value="{{ settings.get('postgres_user', 'postgres') }}">
+                                    <div class="form-text">Default username for PostgreSQL connections</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="postgres_password" class="form-label">PostgreSQL Password</label>
+                                    <input type="password" class="form-control" id="postgres_password" name="postgres_password" 
+                                           value="{{ settings.get('postgres_password', '') }}">
+                                    <div class="form-text">Leave empty if using peer authentication</div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="postgres_host" class="form-label">PostgreSQL Host</label>
+                                    <input type="text" class="form-control" id="postgres_host" name="postgres_host" 
+                                           value="{{ settings.get('postgres_host', 'localhost') }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="postgres_port" class="form-label">PostgreSQL Port</label>
+                                    <input type="number" class="form-control" id="postgres_port" name="postgres_port" 
+                                           value="{{ settings.get('postgres_port', '5432') }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Paths Settings -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-folder me-2"></i>File Paths</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="filestore_dir" class="form-label">Filestore Directory</label>
+                                <input type="text" class="form-control" id="filestore_dir" name="filestore_dir" 
+                                       value="{{ settings.get('filestore_dir', filestore_dir) }}">
+                                <div class="form-text">Directory where Odoo filestore folders are stored</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="upload_folder" class="form-label">Upload Folder</label>
+                                <input type="text" class="form-control" id="upload_folder" name="upload_folder" 
+                                       value="{{ settings.get('upload_folder', upload_folder) }}">
+                                <div class="form-text">Temporary directory for file uploads</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="ssh_config_dir" class="form-label">SSH Config Directory</label>
+                                <input type="text" class="form-control" id="ssh_config_dir" name="ssh_config_dir" 
+                                       value="{{ settings.get('ssh_config_dir', ssh_config_dir) }}">
+                                <div class="form-text">Directory for SSH configuration files</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Settings -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Application Settings</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="default_odoo_version" class="form-label">Default Odoo Version</label>
+                                <select class="form-select" id="default_odoo_version" name="default_odoo_version">
+                                    <option value="17.0" {% if settings.get('default_odoo_version') == '17.0' %}selected{% endif %}>17.0</option>
+                                    <option value="16.0" {% if settings.get('default_odoo_version') == '16.0' %}selected{% endif %}>16.0</option>
+                                    <option value="15.0" {% if settings.get('default_odoo_version') == '15.0' %}selected{% endif %}>15.0</option>
+                                    <option value="14.0" {% if settings.get('default_odoo_version') == '14.0' %}selected{% endif %}>14.0</option>
+                                    <option value="13.0" {% if settings.get('default_odoo_version') == '13.0' %}selected{% endif %}>13.0</option>
+                                </select>
+                                <div class="form-text">Default Odoo version for new projects</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="auto_backup_before_drop" name="auto_backup_before_drop" 
+                                           {% if settings.get('auto_backup_before_drop', 'true') == 'true' %}checked{% endif %}>
+                                    <label class="form-check-label" for="auto_backup_before_drop">
+                                        Automatic backup before dropping databases
+                                    </label>
+                                </div>
+                                <div class="form-text">Create a backup automatically before dropping a database</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="dark_mode" name="dark_mode" 
+                                           {% if settings.get('dark_mode', 'false') == 'true' %}checked{% endif %}>
+                                    <label class="form-check-label" for="dark_mode">
+                                        Dark Mode
+                                    </label>
+                                </div>
+                                <div class="form-text">Use dark theme for the application (experimental)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-outline-secondary me-md-2" onclick="resetSettings()">
+                            <i class="fas fa-undo me-1"></i> Reset to Defaults
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetSettings() {
+    if (confirm("Are you sure you want to reset all settings to their default values?")) {
+        window.location.href = "{{ url_for('reset_settings') }}";
+    }
+}
+</script>
+{% endblock %}

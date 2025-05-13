@@ -49,6 +49,11 @@
                         <i class="fas fa-database"></i> <span class="menu-text">Database Management</span>
                     </a>
                 </li>
+                <li {% if '/settings' in request.path %}class="active"{% endif %}>
+                    <a href="{{ url_for('settings') }}">
+                        <i class="fas fa-cog"></i> <span class="menu-text">Settings</span>
+                    </a>
+                </li>
             </ul>
 
             <div class="sidebar-footer">
