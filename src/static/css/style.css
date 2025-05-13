@@ -283,6 +283,29 @@ a {
     color: white;
 }
 
+/* Progress bar styling */
+.operation-progress {
+    display: none;
+    margin-top: 20px;
+}
+
+.operation-progress .progress {
+    height: 25px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) inset;
+}
+
+.operation-progress .progress-bar {
+    line-height: 25px;
+    font-weight: 500;
+}
+
+.operation-status {
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     #sidebar {
