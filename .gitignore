@@ -1,0 +1,13 @@
+# Ignore python build files
+*.egg
+*.egg-info
+dist
+build
+
+# Ignore python package files
+*.pyc
+*.pyo
+__pycache__/
+.vscode/
+.idea/
+instance/
