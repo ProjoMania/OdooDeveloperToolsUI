@@ -420,9 +420,12 @@ def restore_database():
                     os.remove(filepath)
                     return redirect(request.url)
                 
-                # Check for filestore.zip
+                # Check for filestore directory or filestore.zip (for backward compatibility)
+                filestore_dir = os.path.join(temp_dir, "filestore")
                 filestore_zip = os.path.join(temp_dir, "filestore.zip")
-                has_filestore = os.path.exists(filestore_zip)
+                has_filestore_dir = os.path.exists(filestore_dir) and os.path.isdir(filestore_dir)
+                has_filestore_zip = os.path.exists(filestore_zip)
+                has_filestore = has_filestore_dir or has_filestore_zip
                 
                 # Connect to PostgreSQL
                 conn = get_db_connection()
@@ -450,7 +453,7 @@ def restore_database():
                 # Restore the SQL dump
                 subprocess.run(["psql", "-U", "postgres", "-d", db_name, "-f", dump_file])
                 
-                # Extract filestore if it exists
+                # Handle filestore if it exists
                 if has_filestore:
                     filestore_path = os.path.join(FILESTORE_DIR, db_name)
                     
@@ -461,9 +464,20 @@ def restore_database():
                     # Create the directory
                     os.makedirs(filestore_path, exist_ok=True)
                     
-                    # Extract the filestore zip
-                    with zipfile.ZipFile(filestore_zip, 'r') as zip_ref:
-                        zip_ref.extractall(filestore_path)
+                    # Copy filestore directory or extract filestore zip
+                    if has_filestore_dir:
+                        # Copy the filestore directory contents
+                        for item in os.listdir(filestore_dir):
+                            source = os.path.join(filestore_dir, item)
+                            destination = os.path.join(filestore_path, item)
+                            if os.path.isdir(source):
+                                shutil.copytree(source, destination)
+                            else:
+                                shutil.copy2(source, destination)
+                    elif has_filestore_zip:
+                        # Extract the filestore zip
+                        with zipfile.ZipFile(filestore_zip, 'r') as zip_ref:
+                            zip_ref.extractall(filestore_path)
                 
                 # Post-restore operations
                 # Connect to the restored database
