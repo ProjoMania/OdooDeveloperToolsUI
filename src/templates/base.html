@@ -31,22 +31,22 @@
             <ul class="list-unstyled components">
                 <li {% if request.path == '/' %}class="active"{% endif %}>
                     <a href="{{ url_for('index') }}">
-                        <i class="fas fa-home"></i> Dashboard
+                        <i class="fas fa-home"></i> <span class="menu-text">Dashboard</span>
                     </a>
                 </li>
                 <li {% if '/projects' in request.path %}class="active"{% endif %}>
                     <a href="{{ url_for('projects') }}">
-                        <i class="fas fa-project-diagram"></i> Projects
+                        <i class="fas fa-project-diagram"></i> <span class="menu-text">Projects</span>
                     </a>
                 </li>
                 <li {% if '/ssh' in request.path %}class="active"{% endif %}>
                     <a href="{{ url_for('ssh_servers') }}">
-                        <i class="fas fa-terminal"></i> SSH Server Management
+                        <i class="fas fa-terminal"></i> <span class="menu-text">SSH Server Management</span>
                     </a>
                 </li>
                 <li {% if '/databases' in request.path %}class="active"{% endif %}>
                     <a href="{{ url_for('list_databases') }}">
-                        <i class="fas fa-database"></i> Database Management
+                        <i class="fas fa-database"></i> <span class="menu-text">Database Management</span>
                     </a>
                 </li>
             </ul>

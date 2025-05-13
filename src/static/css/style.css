@@ -114,7 +114,7 @@ a {
     margin-bottom: 5px;
 }
 
-#sidebar.active ul li a span {
+#sidebar.active .menu-text {
     display: none;
 }
 
