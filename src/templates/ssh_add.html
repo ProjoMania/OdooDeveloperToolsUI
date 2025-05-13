@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Add SSH Server - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Add SSH Server{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Add SSH Server</h5>
+                <a href="{{ url_for('ssh_servers') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back to List
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('add_ssh_server') }}">
+                    {% if overwrite %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i> SSH configuration for <strong>{{ host }}</strong> already exists. Proceeding will overwrite the existing configuration.
+                        <input type="hidden" name="confirm_overwrite" value="1">
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <label for="host" class="form-label required">Host Name (alias)</label>
+                        <input type="text" class="form-control" id="host" name="host" 
+                               value="{{ host|default('') }}" required 
+                               placeholder="e.g., odoo-server">
+                        <div class="form-text">This is the name you'll use to reference this server</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="hostname" class="form-label required">IP/Domain</label>
+                        <input type="text" class="form-control" id="hostname" name="hostname" 
+                               value="{{ hostname|default('') }}" required 
+                               placeholder="e.g., 192.168.1.100 or example.com">
+                        <div class="form-text">The actual IP address or domain name of the server</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="user" class="form-label">User</label>
+                        <input type="text" class="form-control" id="user" name="user" 
+                               value="{{ user|default('') }}" 
+                               placeholder="e.g., ubuntu">
+                        <div class="form-text">The username to connect with (optional)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="port" class="form-label">Port</label>
+                        <input type="text" class="form-control" id="port" name="port" 
+                               value="{{ port|default('22') }}" 
+                               placeholder="22">
+                        <div class="form-text">SSH port (default is 22)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="key_file" class="form-label">SSH Key File</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="key_file" name="key_file" 
+                                   value="{{ key_file|default('') }}" 
+                                   placeholder="e.g., ~/.ssh/id_rsa">
+                            <button class="btn btn-outline-secondary" type="button" id="browse-key">
+                                Browse
+                            </button>
+                        </div>
+                        <div class="form-text">Path to your SSH key file (optional)</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Save SSH Server
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">SSH Configuration Tips</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="fas fa-key me-2"></i> About SSH Keys</h6>
+                    <p>SSH keys provide a more secure way to log into an SSH server than using a password alone.</p>
+                    <p>Common locations for SSH keys:</p>
+                    <ul>
+                        <li><code>~/.ssh/id_rsa</code> (default RSA key)</li>
+                        <li><code>~/.ssh/id_ed25519</code> (newer ED25519 key, more secure)</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h6><i class="fas fa-info-circle me-2"></i> How SSH Configurations Work</h6>
+                    <p>When you add an SSH server here, a configuration file is created in <code>~/.ssh/config.d/</code> directory.</p>
+                    <p>This allows you to simply run <code>ssh hostname</code> instead of remembering complex connection details.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle browsing for SSH key file (in a real desktop app this would open a file dialog)
+        // For the web app, we show a modal with common SSH key locations
+        const browseButton = document.getElementById('browse-key');
+        const keyFileInput = document.getElementById('key_file');
+        
+        if (browseButton) {
+            browseButton.addEventListener('click', function() {
+                // In a full implementation, this would show a modal with a file browser
+                // For now, we'll just provide some common options
+                const commonKeys = [
+                    '~/.ssh/id_rsa',
+                    '~/.ssh/id_ed25519',
+                    '~/.ssh/id_dsa',
+                    '~/.ssh/id_ecdsa'
+                ];
+                
+                let selectedKey = prompt(
+                    'Enter the path to your SSH key file or select from common locations:\n\n' + 
+                    commonKeys.join('\n'),
+                    keyFileInput.value || '~/.ssh/id_rsa'
+                );
+                
+                if (selectedKey) {
+                    keyFileInput.value = selectedKey;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

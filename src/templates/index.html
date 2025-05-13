@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <!-- Welcome Card -->
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body text-center p-5">
+                <h2 class="mb-4">Welcome to Odoo Developer Tools</h2>
+                <p class="lead">A modern web application to simplify Odoo development and server management tasks</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- SSH Management Card -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="dashboard-card-icon">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <h4 class="card-title">SSH Server Management</h4>
+                <p class="card-text">Configure and connect to your SSH servers with ease.</p>
+                <a href="{{ url_for('ssh_servers') }}" class="btn btn-primary mt-3">Manage SSH Servers</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Database Management Card -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="dashboard-card-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h4 class="card-title">Database Management</h4>
+                <p class="card-text">List, drop, restore, and manage Odoo databases.</p>
+                <a href="{{ url_for('list_databases') }}" class="btn btn-primary mt-3">Manage Databases</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Enterprise License Card -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="dashboard-card-icon">
+                    <i class="fas fa-key"></i>
+                </div>
+                <h4 class="card-title">Enterprise License</h4>
+                <p class="card-text">Extend Odoo Enterprise license expiration dates.</p>
+                <a href="{{ url_for('extend_enterprise') }}" class="btn btn-primary mt-3">Extend Licenses</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Links</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('ssh_servers') }}" class="text-decoration-none">
+                            <i class="fas fa-list me-2"></i> List SSH Servers
+                        </a>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('add_ssh_server') }}" class="text-decoration-none">
+                            <i class="fas fa-plus me-2"></i> Add SSH Server
+                        </a>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('list_databases') }}" class="text-decoration-none">
+                            <i class="fas fa-list me-2"></i> List Databases
+                        </a>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('restore_database') }}" class="text-decoration-none">
+                            <i class="fas fa-upload me-2"></i> Restore Database
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">About</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Odoo Developer Tools</strong> is designed to make Odoo development and server management easier across Linux distributions.</p>
+                <p>This web application offers a modern interface for tasks previously handled through command-line tools.</p>
+                <h6 class="mt-4">Features:</h6>
+                <ul>
+                    <li>SSH server configuration management</li>
+                    <li>Odoo database operations (list, drop, restore)</li>
+                    <li>Enterprise license extension</li>
+                    <li>Responsive design that works across devices</li>
+                </ul>
+                <p class="mt-3">Based on <a href="https://github.com/ProjoMania/OdooDeveloperTools" target="_blank">OdooDeveloperTools</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

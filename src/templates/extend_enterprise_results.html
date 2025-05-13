@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}License Extension Results - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}License Extension Results{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Enterprise License Extension Results</h5>
+                <a href="{{ url_for('list_databases') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Databases
+                </a>
+            </div>
+            <div class="card-body">
+                {% if results %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Database</th>
+                                    <th>Previous Expiration</th>
+                                    <th>New Expiration</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in results %}
+                                <tr>
+                                    <td>{{ result.database }}</td>
+                                    <td>{{ result.old_date }}</td>
+                                    <td>{{ result.new_date }}</td>
+                                    <td class="text-center">
+                                        {% if result.status == 'success' %}
+                                            <span class="badge bg-success">Success</span>
+                                        {% else %}
+                                            <span class="badge bg-danger" 
+                                                  data-bs-toggle="tooltip" 
+                                                  title="{{ result.message }}">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> No Odoo Enterprise databases found on this system.
+                    </div>
+                {% endif %}
+                
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('extend_enterprise') }}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-redo me-1"></i> Run Again
+                    </a>
+                    <a href="{{ url_for('list_databases') }}" class="btn btn-primary">
+                        <i class="fas fa-database me-1"></i> View Databases
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Next Steps</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="fas fa-sync-alt me-2"></i> Restart Your Odoo Server</h6>
+                    <p>For the changes to take effect, you may need to restart your Odoo server.</p>
+                    <p>Typical commands to restart Odoo:</p>
+                    <ul>
+                        <li>systemd: <code>sudo systemctl restart odoo</code></li>
+                        <li>Service: <code>sudo service odoo restart</code></li>
+                        <li>Manual: Stop the current Odoo process and start it again</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i> 
+                    <strong>All Done!</strong> Your Odoo Enterprise licenses have been extended by 20 days.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

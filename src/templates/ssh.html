@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}SSH Server Management - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}SSH Server Management{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">SSH Servers</h5>
+                <a href="{{ url_for('add_ssh_server') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i> Add Server
+                </a>
+            </div>
+            <div class="card-body">
+                {% if servers %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Host</th>
+                                <th>IP/Domain</th>
+                                <th>User</th>
+                                <th>Port</th>
+                                <th>Key File</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for server in servers %}
+                            <tr>
+                                <td>{{ server.host }}</td>
+                                <td>{{ server.hostname }}</td>
+                                <td>{{ server.user }}</td>
+                                <td>{{ server.port }}</td>
+                                <td class="text-truncate" style="max-width: 200px;" title="{{ server.key_file }}">
+                                    {{ server.key_file }}
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary copy-ssh-command"
+                                            data-host="{{ server.host }}"
+                                            data-bs-toggle="tooltip" 
+                                            title="Copy SSH Command">
+                                        <i class="fas fa-copy"></i> Copy
+                                    </button>
+                                    <button class="btn btn-sm btn-success connect-ssh-server"
+                                            data-host="{{ server.host }}"
+                                            data-bs-toggle="tooltip" 
+                                            title="Connect to Server">
+                                        <i class="fas fa-terminal"></i> Connect
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No SSH servers configured yet. 
+                    <a href="{{ url_for('add_ssh_server') }}">Add your first SSH server</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">What are SSH Servers?</h5>
+            </div>
+            <div class="card-body">
+                <p>SSH (Secure Shell) is a protocol used to securely connect to remote servers.</p>
+                <p>By configuring your SSH servers here, you can:</p>
+                <ul>
+                    <li>Easily connect to your servers without remembering details</li>
+                    <li>Use aliases instead of IP addresses</li>
+                    <li>Store authentication settings securely</li>
+                </ul>
+                <p>All configurations are saved to your <code>~/.ssh/config.d/</code> directory.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">How to Connect</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>Click the <strong>Connect</strong> button next to a server</li>
+                    <li>A new terminal window will open (requires terminal emulator installed)</li>
+                    <li>Alternatively, copy the SSH command and paste in your terminal</li>
+                </ol>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> All SSH connections use your system's SSH client and respect your local SSH configuration.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Extra JavaScript for SSH page if needed
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Database Management - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Odoo Database Management{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between mb-4">
+            <div>
+                <button id="refresh-db-list" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh List
+                </button>
+            </div>
+            <div>
+                <a href="{{ url_for('restore_database') }}" class="btn btn-success me-2">
+                    <i class="fas fa-upload me-1"></i> Restore Database
+                </a>
+                <a href="{{ url_for('extend_enterprise') }}" class="btn btn-primary">
+                    <i class="fas fa-key me-1"></i> Extend Enterprise License
+                </a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Odoo Databases</h5>
+            </div>
+            <div class="card-body">
+                {% if databases %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Database Name</th>
+                                <th>Owner</th>
+                                <th>Odoo Version</th>
+                                <th>DB Size</th>
+                                <th>Filestore Size</th>
+                                <th class="text-center">Type</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for db in databases %}
+                            <tr>
+                                <td>{{ db.name }}</td>
+                                <td>{{ db.owner }}</td>
+                                <td>{{ db.version }}</td>
+                                <td>{{ db.size }}</td>
+                                <td>{{ db.filestore_size }}</td>
+                                <td class="text-center">
+                                    {% if db.is_enterprise %}
+                                    <span class="badge badge-enterprise">Enterprise</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Community</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('drop_database', db_name=db.name) }}" 
+                                       class="btn btn-sm btn-danger"
+                                       data-bs-toggle="tooltip"
+                                       title="Drop Database">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> No Odoo databases found.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Database Information</h5>
+            </div>
+            <div class="card-body">
+                <p>This page shows all PostgreSQL databases on your system, with special features for identifying and managing Odoo databases.</p>
+                <p>For each database, you can see:</p>
+                <ul>
+                    <li><strong>Owner:</strong> The PostgreSQL role that owns the database</li>
+                    <li><strong>Odoo Version:</strong> The version of Odoo (if it's an Odoo database)</li>
+                    <li><strong>DB Size:</strong> The size of the PostgreSQL database</li>
+                    <li><strong>Filestore Size:</strong> The size of the Odoo file attachments folder</li>
+                    <li><strong>Type:</strong> Whether it's a Community or Enterprise Odoo installation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="fas fa-trash me-2 text-danger"></i> Drop Database</h6>
+                    <p>This will permanently delete the selected database and its filestore. This action cannot be undone.</p>
+                </div>
+                
+                <div class="mb-3">
+                    <h6><i class="fas fa-upload me-2 text-success"></i> Restore Database</h6>
+                    <p>Restore a database from a backup file (.zip format). You can also set options like deactivating cron jobs or resetting the admin password.</p>
+                </div>
+                
+                <div>
+                    <h6><i class="fas fa-key me-2 text-primary"></i> Extend Enterprise License</h6>
+                    <p>Extend the expiration date of Odoo Enterprise licenses by 20 days. This will be applied to all Enterprise databases.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

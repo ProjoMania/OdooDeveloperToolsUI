@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Extend Enterprise License - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Extend Enterprise License{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Extend Odoo Enterprise License</h5>
+                <a href="{{ url_for('list_databases') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Databases
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> 
+                    This function will extend the expiration date of all Odoo Enterprise databases by 20 days.
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">What This Does</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>When you run this operation, the system will:</p>
+                        <ol>
+                            <li>Scan all databases on your system</li>
+                            <li>Identify those with the Odoo Enterprise module (<code>web_enterprise</code>) installed</li>
+                            <li>For each Enterprise database, add 20 days to the current expiration date</li>
+                            <li>Report the results with old and new expiration dates</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <form method="post" action="{{ url_for('extend_enterprise') }}">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-key me-1"></i> Extend All Enterprise Licenses
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">About Odoo Enterprise Licensing</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="fas fa-question-circle me-2"></i> How Odoo Enterprise Licensing Works</h6>
+                    <p>Odoo Enterprise databases include an expiration date stored in the <code>ir_config_parameter</code> table with key <code>database.expiration_date</code>.</p>
+                    <p>When this date is reached, certain Enterprise features become limited until the subscription is renewed.</p>
+                </div>
+                
+                <div class="mb-3">
+                    <h6><i class="fas fa-exclamation-triangle me-2 text-warning"></i> Important Note</h6>
+                    <p>This tool is meant for development and testing purposes only. For production environments, you should have a valid Odoo Enterprise subscription.</p>
+                </div>
+                
+                <div class="alert alert-secondary">
+                    <i class="fas fa-lightbulb me-2"></i> <strong>Tip:</strong> 
+                    After extending the license, you may need to restart your Odoo server for the changes to take effect.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
