@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - Project Details{% endblock %}
+
+{% block page_title %}Project: {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Project Details</h5>
+                <div>
+                    <a href="{{ url_for('edit_project', project_id=project.id) }}" class="btn btn-outline-primary btn-sm me-1">
+                        <i class="fas fa-edit me-1"></i> Edit
+                    </a>
+                    <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h4>{{ project.name }}</h4>
+                    <div class="mb-3">
+                        {% if project.status == 'active' %}
+                        <span class="badge bg-success">Active</span>
+                        {% elif project.status == 'completed' %}
+                        <span class="badge bg-primary">Completed</span>
+                        {% elif project.status == 'archived' %}
+                        <span class="badge bg-secondary">Archived</span>
+                        {% endif %}
+                        
+                        {% if project.start_date %}
+                        <span class="badge bg-light text-dark">
+                            Start: {{ project.start_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
+                        
+                        {% if project.end_date %}
+                        <span class="badge bg-light text-dark">
+                            End: {{ project.end_date.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <h6 class="text-muted mb-2">Description</h6>
+                    {% if project.description %}
+                    <p>{{ project.description }}</p>
+                    {% else %}
+                    <p class="text-muted fst-italic">No description provided</p>
+                    {% endif %}
+                    
+                    {% if project.repository_url %}
+                    <div class="mt-3">
+                        <h6 class="text-muted mb-2">Repository</h6>
+                        <a href="{{ project.repository_url }}" target="_blank" class="d-flex align-items-center text-decoration-none">
+                            <i class="fab fa-git me-2"></i> {{ project.repository_url }}
+                            <i class="fas fa-external-link-alt ms-2 small"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-tasks me-2 text-primary"></i>
+                                <h6 class="mb-0">Tasks</h6>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Total:</span>
+                                <span class="fw-bold">{{ project.tasks|length }}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="small">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>To Do:</span>
+                                    <span>{{ project.tasks|selectattr('status', 'equalto', 'todo')|list|length }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>In Progress:</span>
+                                    <span>{{ project.tasks|selectattr('status', 'equalto', 'in_progress')|list|length }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Completed:</span>
+                                    <span>{{ project.tasks|selectattr('status', 'equalto', 'done')|list|length }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-server me-2 text-primary"></i>
+                                <h6 class="mb-0">Servers</h6>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Linked:</span>
+                                <span class="fw-bold">{{ project.servers|length }}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="small">
+                                {% for role, count in server_roles.items() %}
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>{{ role|capitalize }}:</span>
+                                    <span>{{ count }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-database me-2 text-primary"></i>
+                                <h6 class="mb-0">Databases</h6>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Linked:</span>
+                                <span class="fw-bold">{{ project.databases|length }}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="small">
+                                {% for dbtype, count in database_types.items() %}
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>{{ dbtype|capitalize }}:</span>
+                                    <span>{{ count }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex mt-3">
+                    <a href="{{ url_for('project_tasks', project_id=project.id) }}" class="btn btn-primary me-2">
+                        <i class="fas fa-tasks me-1"></i> View Tasks
+                    </a>
+                    <a href="{{ url_for('create_task', project_id=project.id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-plus me-1"></i> Add Task
+                    </a>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                <div class="d-flex justify-content-between">
+                    <div>Created: {{ project.created_at.strftime('%Y-%m-%d') }}</div>
+                    <div>Last updated: {{ project.updated_at.strftime('%Y-%m-%d') }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Linked Servers</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkServerModal">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                {% if project.servers %}
+                <ul class="list-group list-group-flush">
+                    {% for server in project.servers %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold d-flex align-items-center">
+                                <i class="fas fa-server me-2 text-muted"></i>
+                                {{ server.server_name }}
+                                {% if server.server_role %}
+                                <span class="badge bg-info ms-2">{{ server.server_role }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted mt-1">Added {{ server.created_at.strftime('%Y-%m-%d') }}</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary copy-ssh-command"
+                                    data-host="{{ server.server_name }}"
+                                    data-bs-toggle="tooltip" 
+                                    title="Copy SSH Command">
+                                <i class="fas fa-terminal"></i>
+                            </button>
+                            <form method="post" action="{{ url_for('unlink_server', project_id=project.id, server_id=server.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                        onclick="return confirm('Are you sure you want to unlink this server?')"
+                                        data-bs-toggle="tooltip" 
+                                        title="Unlink Server">
+                                    <i class="fas fa-unlink"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-server fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No servers linked to this project</p>
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#linkServerModal">
+                        Link Servers
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Linked Databases</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkDatabaseModal">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                {% if project.databases %}
+                <ul class="list-group list-group-flush">
+                    {% for db in project.databases %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold d-flex align-items-center">
+                                <i class="fas fa-database me-2 text-muted"></i>
+                                {{ db.database_name }}
+                                {% if db.database_type %}
+                                <span class="badge bg-info ms-2">{{ db.database_type }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted mt-1">Added {{ db.created_at.strftime('%Y-%m-%d') }}</div>
+                        </div>
+                        <div>
+                            <form method="post" action="{{ url_for('unlink_database', project_id=project.id, database_id=db.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Are you sure you want to unlink this database?')"
+                                        data-bs-toggle="tooltip" 
+                                        title="Unlink Database">
+                                    <i class="fas fa-unlink"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-database fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No databases linked to this project</p>
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#linkDatabaseModal">
+                        Link Databases
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Tasks</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if project.tasks %}
+                <ul class="list-group list-group-flush">
+                    {% for task in project.tasks|sort(attribute='updated_at', reverse=true)|slice(0, 5) %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('view_task', project_id=project.id, task_id=task.id) }}" class="text-decoration-none">{{ task.title }}</a>
+                            {% if task.status == 'todo' %}
+                            <span class="badge bg-secondary">To Do</span>
+                            {% elif task.status == 'in_progress' %}
+                            <span class="badge bg-primary">In Progress</span>
+                            {% elif task.status == 'review' %}
+                            <span class="badge bg-info">In Review</span>
+                            {% elif task.status == 'done' %}
+                            <span class="badge bg-success">Completed</span>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted mt-1">Updated {{ task.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-tasks fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No tasks for this project yet</p>
+                    <a href="{{ url_for('create_task', project_id=project.id) }}" class="btn btn-sm btn-outline-primary mt-2">
+                        Create Task
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Link Server Modal -->
+<div class="modal fade" id="linkServerModal" tabindex="-1" aria-labelledby="linkServerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="linkServerModalLabel">Link Server to Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ url_for('link_server', project_id=project.id) }}">
+                    <div class="mb-3">
+                        <label for="server_name" class="form-label required">Server</label>
+                        <select class="form-select" id="server_name" name="server_name" required>
+                            <option value="">Select a server</option>
+                            {% for server in available_servers %}
+                            <option value="{{ server.host }}">{{ server.host }} ({{ server.hostname }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="server_role" class="form-label">Server Role</label>
+                        <select class="form-select" id="server_role" name="server_role">
+                            <option value="">Select a role (optional)</option>
+                            <option value="production">Production</option>
+                            <option value="staging">Staging</option>
+                            <option value="development">Development</option>
+                            <option value="testing">Testing</option>
+                        </select>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-link me-1"></i> Link Server
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Link Database Modal -->
+<div class="modal fade" id="linkDatabaseModal" tabindex="-1" aria-labelledby="linkDatabaseModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="linkDatabaseModalLabel">Link Database to Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ url_for('link_database', project_id=project.id) }}">
+                    <div class="mb-3">
+                        <label for="database_name" class="form-label required">Database</label>
+                        <select class="form-select" id="database_name" name="database_name" required>
+                            <option value="">Select a database</option>
+                            {% for db in available_databases %}
+                            <option value="{{ db.name }}">{{ db.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="database_type" class="form-label">Database Type</label>
+                        <select class="form-select" id="database_type" name="database_type">
+                            <option value="">Select a type (optional)</option>
+                            <option value="production">Production</option>
+                            <option value="staging">Staging</option>
+                            <option value="development">Development</option>
+                            <option value="testing">Testing</option>
+                        </select>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-link me-1"></i> Link Database
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

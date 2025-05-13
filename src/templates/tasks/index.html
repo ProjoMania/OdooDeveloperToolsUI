@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - {{ project.name }} - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Tasks for {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Project Tasks</h5>
+                <div>
+                    <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Project
+                    </a>
+                    <a href="{{ url_for('create_task', project_id=project.id) }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i> New Task
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="taskSearch" placeholder="Search tasks...">
+                            <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 d-flex justify-content-md-end mt-3 mt-md-0">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+                            <button type="button" class="btn btn-outline-secondary" data-filter="todo">To Do</button>
+                            <button type="button" class="btn btn-outline-secondary" data-filter="in_progress">In Progress</button>
+                            <button type="button" class="btn btn-outline-secondary" data-filter="review">In Review</button>
+                            <button type="button" class="btn btn-outline-secondary" data-filter="done">Done</button>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if tasks %}
+                <div id="tasks-container">
+                    {% for status, label, icon, color in [
+                        ('todo', 'To Do', 'list', 'secondary'),
+                        ('in_progress', 'In Progress', 'spinner', 'primary'),
+                        ('review', 'In Review', 'eye', 'info'),
+                        ('done', 'Completed', 'check', 'success')
+                    ] %}
+                    <div class="task-group mb-4" data-status="{{ status }}">
+                        <h5 class="mb-3">
+                            <i class="fas fa-{{ icon }} me-2 text-{{ color }}"></i>
+                            {{ label }}
+                            <span class="badge bg-{{ color }} rounded-pill ms-2">
+                                {{ tasks|selectattr('status', 'equalto', status)|list|length }}
+                            </span>
+                        </h5>
+                        <div class="task-list">
+                            {% for task in tasks if task.status == status %}
+                            <div class="card mb-2 task-card" data-id="{{ task.id }}" data-title="{{ task.title }}" data-status="{{ task.status }}" data-priority="{{ task.priority }}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-1">
+                                            <a href="{{ url_for('view_task', project_id=project.id, task_id=task.id) }}" class="text-decoration-none">
+                                                {{ task.title }}
+                                            </a>
+                                        </h5>
+                                        <div>
+                                            {% if task.priority == 'low' %}
+                                            <span class="badge bg-success">Low</span>
+                                            {% elif task.priority == 'medium' %}
+                                            <span class="badge bg-primary">Medium</span>
+                                            {% elif task.priority == 'high' %}
+                                            <span class="badge bg-warning text-dark">High</span>
+                                            {% elif task.priority == 'urgent' %}
+                                            <span class="badge bg-danger">Urgent</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <p class="card-text text-muted small mb-2">{{ task.description|truncate(100) }}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="small text-muted">
+                                            {% if task.due_date %}
+                                            <i class="far fa-calendar-alt me-1"></i> 
+                                            <span class="{% if task.due_date < now %}text-danger{% endif %}">
+                                                Due: {{ task.due_date.strftime('%Y-%m-%d') }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <a href="{{ url_for('edit_task', project_id=project.id, task_id=task.id) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{{ url_for('view_task', project_id=project.id, task_id=task.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            
+                            {% if tasks|selectattr('status', 'equalto', status)|list|length == 0 %}
+                            <div class="text-center p-3 border rounded bg-light">
+                                <i class="fas fa-{{ icon }} text-muted"></i>
+                                <p class="text-muted small mb-0">No tasks in this column</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="fas fa-tasks fa-4x text-muted"></i>
+                    </div>
+                    <h4>No tasks for this project yet</h4>
+                    <p class="text-muted">Create your first task to get started.</p>
+                    <a href="{{ url_for('create_task', project_id=project.id) }}" class="btn btn-primary mt-2">
+                        <i class="fas fa-plus me-2"></i> Create Your First Task
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Task filtering
+        const filterButtons = document.querySelectorAll('[data-filter]');
+        const taskGroups = document.querySelectorAll('.task-group');
+        const searchInput = document.getElementById('taskSearch');
+        const clearButton = document.getElementById('clearSearch');
+        const taskCards = document.querySelectorAll('.task-card');
+        
+        // Filter tasks by status
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Update active button
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                const filter = button.dataset.filter;
+                
+                // Show/hide task groups based on filter
+                if (filter === 'all') {
+                    taskGroups.forEach(group => {
+                        group.style.display = 'block';
+                    });
+                } else {
+                    taskGroups.forEach(group => {
+                        if (group.dataset.status === filter) {
+                            group.style.display = 'block';
+                        } else {
+                            group.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Also apply search filter if there's a search term
+                if (searchInput.value.trim() !== '') {
+                    applySearchFilter(searchInput.value.trim().toLowerCase());
+                }
+            });
+        });
+        
+        // Search functionality
+        function applySearchFilter(searchTerm) {
+            taskCards.forEach(card => {
+                const title = card.dataset.title.toLowerCase();
+                if (title.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            // Check if any tasks are visible in each group
+            taskGroups.forEach(group => {
+                if (group.style.display !== 'none') {  // Only for visible groups (status filter)
+                    const visibleTasks = group.querySelectorAll('.task-card[style="display: block;"]');
+                    const noTasksMessage = group.querySelector('.bg-light');
+                    
+                    if (visibleTasks.length === 0 && noTasksMessage) {
+                        noTasksMessage.style.display = 'block';
+                    } else if (noTasksMessage) {
+                        noTasksMessage.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.trim().toLowerCase();
+            applySearchFilter(searchTerm);
+        });
+        
+        clearButton.addEventListener('click', () => {
+            searchInput.value = '';
+            taskCards.forEach(card => {
+                card.style.display = 'block';
+            });
+            
+            // Reset "no tasks" messages
+            document.querySelectorAll('.bg-light').forEach(el => {
+                const group = el.closest('.task-group');
+                const cards = group.querySelectorAll('.task-card');
+                el.style.display = cards.length === 0 ? 'block' : 'none';
+            });
+        });
+    });
+</script>
+{% endblock %}

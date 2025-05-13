@@ -34,6 +34,11 @@
                         <i class="fas fa-home"></i> Dashboard
                     </a>
                 </li>
+                <li {% if '/projects' in request.path %}class="active"{% endif %}>
+                    <a href="{{ url_for('projects') }}">
+                        <i class="fas fa-project-diagram"></i> Projects
+                    </a>
+                </li>
                 <li {% if '/ssh' in request.path %}class="active"{% endif %}>
                     <a href="{{ url_for('ssh_servers') }}">
                         <i class="fas fa-terminal"></i> SSH Server Management

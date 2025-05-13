@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if project %}Edit Project{% else %}Create Project{% endif %} - Odoo Developer Tools
+{% endblock %}
+
+{% block page_title %}
+{% if project %}Edit Project{% else %}Create New Project{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{% if project %}Edit{% else %}New{% endif %} Project</h5>
+                <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Projects
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('edit_project', project_id=project.id) if project else url_for('create_project') }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label required">Project Name</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ project.name if project else '' }}" required
+                               placeholder="Enter project name">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"
+                                  placeholder="Enter project description">{{ project.description if project else '' }}</textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="active" {% if project and project.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="completed" {% if project and project.status == 'completed' %}selected{% endif %}>Completed</option>
+                                <option value="archived" {% if project and project.status == 'archived' %}selected{% endif %}>Archived</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="repo_url" class="form-label">Repository URL</label>
+                            <input type="url" class="form-control" id="repo_url" name="repo_url" 
+                                   value="{{ project.repository_url if project else '' }}"
+                                   placeholder="https://github.com/username/repo">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ project.start_date.strftime('%Y-%m-%d') if project and project.start_date else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="deadline" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="deadline" name="deadline" 
+                                   value="{{ project.end_date.strftime('%Y-%m-%d') if project and project.end_date else '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> {% if project %}Update{% else %}Create{% endif %} Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if project %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Linked Resources</h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#linkResourceModal">
+                    <i class="fas fa-link me-1"></i> Link Resources
+                </button>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="resourceTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="servers-tab" data-bs-toggle="tab" data-bs-target="#servers-tab-pane" type="button" role="tab">
+                            <i class="fas fa-server me-1"></i> Servers ({{ project.servers|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="databases-tab" data-bs-toggle="tab" data-bs-target="#databases-tab-pane" type="button" role="tab">
+                            <i class="fas fa-database me-1"></i> Databases ({{ project.databases|length }})
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="resourceTabsContent">
+                    <div class="tab-pane fade show active" id="servers-tab-pane" role="tabpanel" aria-labelledby="servers-tab" tabindex="0">
+                        {% if project.servers %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Server Name</th>
+                                            <th>Role</th>
+                                            <th>Added On</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for server in project.servers %}
+                                        <tr>
+                                            <td>{{ server.server_name }}</td>
+                                            <td>
+                                                {% if server.server_role %}
+                                                <span class="badge bg-info">{{ server.server_role }}</span>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ server.created_at.strftime('%Y-%m-%d') }}</td>
+                                            <td class="text-end">
+                                                <form method="post" action="{{ url_for('unlink_server', project_id=project.id, server_id=server.id) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                            onclick="return confirm('Are you sure you want to unlink this server?')">
+                                                        <i class="fas fa-unlink"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center p-4">
+                                <i class="fas fa-server fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">No servers linked to this project</p>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#linkResourceModal">
+                                    Link Servers
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="databases-tab-pane" role="tabpanel" aria-labelledby="databases-tab" tabindex="0">
+                        {% if project.databases %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Database Name</th>
+                                            <th>Type</th>
+                                            <th>Added On</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for db in project.databases %}
+                                        <tr>
+                                            <td>{{ db.database_name }}</td>
+                                            <td>
+                                                {% if db.database_type %}
+                                                <span class="badge bg-info">{{ db.database_type }}</span>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ db.created_at.strftime('%Y-%m-%d') }}</td>
+                                            <td class="text-end">
+                                                <form method="post" action="{{ url_for('unlink_database', project_id=project.id, database_id=db.id) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Are you sure you want to unlink this database?')">
+                                                        <i class="fas fa-unlink"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center p-4">
+                                <i class="fas fa-database fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">No databases linked to this project</p>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#linkResourceModal">
+                                    Link Databases
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Link Resource Modal -->
+<div class="modal fade" id="linkResourceModal" tabindex="-1" aria-labelledby="linkResourceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="linkResourceModalLabel">Link Resources to Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="linkResourceTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="link-server-tab" data-bs-toggle="tab" data-bs-target="#link-server-tab-pane" type="button" role="tab">
+                            <i class="fas fa-server me-1"></i> Link Server
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="link-database-tab" data-bs-toggle="tab" data-bs-target="#link-database-tab-pane" type="button" role="tab">
+                            <i class="fas fa-database me-1"></i> Link Database
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content p-3" id="linkResourceTabsContent">
+                    <!-- Link Server Tab -->
+                    <div class="tab-pane fade show active" id="link-server-tab-pane" role="tabpanel" aria-labelledby="link-server-tab" tabindex="0">
+                        <form method="post" action="{{ url_for('link_server', project_id=project.id) }}">
+                            <div class="mb-3">
+                                <label for="server_name" class="form-label required">Server</label>
+                                <select class="form-select" id="server_name" name="server_name" required>
+                                    <option value="">Select a server</option>
+                                    {% for server in available_servers %}
+                                    <option value="{{ server.host }}">{{ server.host }} ({{ server.hostname }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="server_role" class="form-label">Server Role</label>
+                                <select class="form-select" id="server_role" name="server_role">
+                                    <option value="">Select a role (optional)</option>
+                                    <option value="production">Production</option>
+                                    <option value="staging">Staging</option>
+                                    <option value="development">Development</option>
+                                    <option value="testing">Testing</option>
+                                </select>
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-link me-1"></i> Link Server
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Link Database Tab -->
+                    <div class="tab-pane fade" id="link-database-tab-pane" role="tabpanel" aria-labelledby="link-database-tab" tabindex="0">
+                        <form method="post" action="{{ url_for('link_database', project_id=project.id) }}">
+                            <div class="mb-3">
+                                <label for="database_name" class="form-label required">Database</label>
+                                <select class="form-select" id="database_name" name="database_name" required>
+                                    <option value="">Select a database</option>
+                                    {% for db in available_databases %}
+                                    <option value="{{ db.name }}">{{ db.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="database_type" class="form-label">Database Type</label>
+                                <select class="form-select" id="database_type" name="database_type">
+                                    <option value="">Select a type (optional)</option>
+                                    <option value="production">Production</option>
+                                    <option value="staging">Staging</option>
+                                    <option value="development">Development</option>
+                                    <option value="testing">Testing</option>
+                                </select>
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-link me-1"></i> Link Database
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

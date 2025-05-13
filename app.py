@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Developer Management Tool - Comprehensive developer workspace management
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 import os
 import psycopg2
@@ -12,6 +13,8 @@ import shutil
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
+import markdown
+from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -20,6 +23,11 @@ app = Flask(__name__,
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = '/tmp/odoo_dev_tools_uploads'
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dev_tools.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+db.init_app(app)
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -616,6 +624,384 @@ def extend_enterprise():
     
     return render_template('extend_enterprise.html')
 
+# === Project Routes ===
+@app.route('/projects')
+def projects():
+    projects = Project.query.all()
+    return render_template('projects/index.html', projects=projects)
+
+@app.route('/projects/new', methods=['GET', 'POST'])
+def create_project():
+    if request.method == 'POST':
+        name = request.form['name']
+        description = request.form.get('description', '')
+        repository_url = request.form.get('repo_url', '')  # Get from repo_url field but use as repository_url
+        status = request.form.get('status', 'active')
+        deadline = None
+        if request.form.get('deadline'):
+            try:
+                deadline = datetime.strptime(request.form.get('deadline'), '%Y-%m-%d')
+            except ValueError:
+                pass
+
+        project = Project(
+            name=name,
+            description=description,
+            repository_url=repository_url,
+            status=status,
+            end_date=deadline  # Map deadline to the end_date field
+        )
+        
+        db.session.add(project)
+        db.session.commit()
+        
+        flash('Project created successfully', 'success')
+        return redirect(url_for('view_project', project_id=project.id))
+        
+    return render_template('projects/form.html')
+
+@app.route('/projects/<int:project_id>')
+def view_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    servers = ProjectServer.query.filter_by(project_id=project_id).all()
+    databases = ProjectDatabase.query.filter_by(project_id=project_id).all()
+    
+    # Calculate task statistics
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.status == 'done'])
+    progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    upcoming_tasks = [t for t in tasks if t.status != 'done' and t.due_date and t.due_date >= datetime.now()]
+    upcoming_tasks.sort(key=lambda x: x.due_date)
+    
+    # Calculate server role statistics
+    server_roles = {}
+    for server in servers:
+        role = server.server_role or 'unspecified'
+        if role in server_roles:
+            server_roles[role] += 1
+        else:
+            server_roles[role] = 1
+    
+    # Calculate database type statistics
+    database_types = {}
+    for db in databases:
+        db_type = db.database_type or 'unspecified'
+        if db_type in database_types:
+            database_types[db_type] += 1
+        else:
+            database_types[db_type] = 1
+    
+    # Get available servers and databases for the modals
+    available_servers = get_ssh_servers()
+    
+    # Get all databases for the database modal
+    conn = get_db_connection()
+    available_databases = []
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
+        available_databases = [{'name': row[0]} for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+    
+    return render_template('projects/view.html', 
+                          project=project,
+                          tasks=tasks,
+                          servers=servers,
+                          databases=databases,
+                          total_tasks=total_tasks,
+                          completed_tasks=completed_tasks,
+                          progress=progress,
+                          upcoming_tasks=upcoming_tasks[:5],  # Show only 5 upcoming tasks
+                          server_roles=server_roles,
+                          database_types=database_types,
+                          available_servers=available_servers,
+                          available_databases=available_databases,
+                          now=datetime.now())  # Add current datetime for comparisons
+
+@app.route('/projects/<int:project_id>/edit', methods=['GET', 'POST'])
+def edit_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    if request.method == 'POST':
+        project.name = request.form['name']
+        project.description = request.form.get('description', '')
+        project.repository_url = request.form.get('repo_url', '')
+        project.status = request.form.get('status', 'active')
+        
+        if request.form.get('deadline'):
+            try:
+                project.end_date = datetime.strptime(request.form.get('deadline'), '%Y-%m-%d')
+            except ValueError:
+                pass
+        else:
+            project.end_date = None
+@app.route('/projects/<int:project_id>/tasks')
+def project_tasks(project_id):
+    project = Project.query.get_or_404(project_id)
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    now = datetime.now()
+    return render_template('tasks/index.html', project=project, tasks=tasks, now=now)
+
+@app.route('/projects/<int:project_id>/tasks/new', methods=['GET', 'POST'])
+def create_task(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    if request.method == 'POST':
+        title = request.form['title']
+        description = request.form.get('description', '')
+        status = request.form.get('status', 'todo')
+        priority = request.form.get('priority', 'medium')
+        
+        due_date = None
+        if request.form.get('due_date'):
+            try:
+                due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d')
+            except ValueError:
+                pass
+                
+        task = Task(
+            title=title,
+            description=description,
+            status=status,
+            priority=priority,
+            due_date=due_date,
+            project_id=project_id
+        )
+        
+        db.session.add(task)
+        db.session.commit()
+        
+        flash('Task created successfully', 'success')
+        return redirect(url_for('view_task', project_id=project_id, task_id=task.id))
+        
+    return render_template('tasks/form.html', project=project)
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>')
+def view_task(project_id, task_id):
+    project = Project.query.get_or_404(project_id)
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure task belongs to the specified project
+    if task.project_id != project_id:
+        flash('Task does not belong to this project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+        
+    now = datetime.now()
+    markdown_enabled = True  # For rendering markdown content
+    
+    return render_template('tasks/view.html', 
+                          project=project, 
+                          task=task, 
+                          now=now,
+                          markdown_enabled=markdown_enabled)
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/edit', methods=['GET', 'POST'])
+def edit_task(project_id, task_id):
+    project = Project.query.get_or_404(project_id)
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure task belongs to the specified project
+    if task.project_id != project_id:
+        flash('Task does not belong to this project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+    
+    if request.method == 'POST':
+        task.title = request.form['title']
+        task.description = request.form.get('description', '')
+        task.status = request.form.get('status', 'todo')
+        task.priority = request.form.get('priority', 'medium')
+        
+        # Update completed_at if status changed to 'done'
+        if task.status == 'done' and not task.completed_at:
+            task.completed_at = datetime.now()
+        elif task.status != 'done':
+            task.completed_at = None
+        
+        if request.form.get('due_date'):
+            try:
+                task.due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d')
+            except ValueError:
+                pass
+        else:
+            task.due_date = None
+            
+        db.session.commit()
+        flash('Task updated successfully', 'success')
+        return redirect(url_for('view_task', project_id=project_id, task_id=task.id))
+        
+    return render_template('tasks/form.html', project=project, task=task)
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/delete', methods=['POST'])
+def delete_task(project_id, task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure task belongs to the specified project
+    if task.project_id != project_id:
+        flash('Task does not belong to this project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+        
+    db.session.delete(task)
+    db.session.commit()
+    flash('Task deleted successfully', 'success')
+    return redirect(url_for('project_tasks', project_id=project_id))
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/status', methods=['POST'])
+def update_task_status(project_id, task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure task belongs to the specified project
+    if task.project_id != project_id:
+        flash('Task does not belong to this project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+        
+    new_status = request.form.get('status')
+    if new_status in ['todo', 'in_progress', 'review', 'done']:
+        task.status = new_status
+        
+        # Update completed_at if status changed to 'done'
+        if new_status == 'done' and not task.completed_at:
+            task.completed_at = datetime.now()
+        elif new_status != 'done':
+            task.completed_at = None
+            
+        db.session.commit()
+        flash('Task status updated', 'success')
+    
+    return redirect(url_for('view_task', project_id=project_id, task_id=task_id))
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/notes/add', methods=['POST'])
+def add_task_note(project_id, task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure task belongs to the specified project
+    if task.project_id != project_id:
+        flash('Task does not belong to this project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+        
+    content = request.form.get('content', '').strip()
+    if content:
+        note = TaskNote(content=content, task_id=task_id)
+        db.session.add(note)
+        db.session.commit()
+        flash('Note added', 'success')
+    
+    return redirect(url_for('view_task', project_id=project_id, task_id=task_id))
+
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/notes/<int:note_id>/delete', methods=['POST'])
+def delete_task_note(project_id, task_id, note_id):
+    note = TaskNote.query.get_or_404(note_id)
+    task = Task.query.get_or_404(task_id)
+    
+    # Ensure note belongs to the specified task and project
+    if note.task_id != task_id or task.project_id != project_id:
+        flash('Note does not belong to this task or project', 'danger')
+        return redirect(url_for('project_tasks', project_id=project_id))
+        
+    db.session.delete(note)
+    db.session.commit()
+    flash('Note deleted', 'success')
+    
+    return redirect(url_for('view_task', project_id=project_id, task_id=task_id))
+
+# Template filter for markdown rendering
+@app.template_filter('markdown')
+def render_markdown(text):
+    if text:
+        return markdown.markdown(text, extensions=['fenced_code', 'tables'])
+    return ''
+
+# === Project Resource Link Routes ===
+@app.route('/projects/<int:project_id>/link-server', methods=['POST'])
+def link_server(project_id):
+    project = Project.query.get_or_404(project_id)
+    server_name = request.form.get('server_name')
+    server_role = request.form.get('server_role', '')
+    
+    if server_name:
+        # Check if server already linked
+        existing = ProjectServer.query.filter_by(
+            project_id=project_id, server_name=server_name
+        ).first()
+        
+        if not existing:
+            server = ProjectServer(
+                project_id=project_id,
+                server_name=server_name,
+                server_role=server_role
+            )
+            db.session.add(server)
+            db.session.commit()
+            flash(f'Server {server_name} linked to project', 'success')
+        else:
+            flash(f'Server {server_name} is already linked to this project', 'warning')
+    else:
+        flash('No server selected', 'danger')
+        
+    return redirect(url_for('view_project', project_id=project_id))
+
+@app.route('/projects/<int:project_id>/link-database', methods=['POST'])
+def link_database(project_id):
+    project = Project.query.get_or_404(project_id)
+    database_name = request.form.get('database_name')
+    database_type = request.form.get('database_type', '')
+    
+    if database_name:
+        # Check if database already linked
+        existing = ProjectDatabase.query.filter_by(
+            project_id=project_id, database_name=database_name
+        ).first()
+        
+        if not existing:
+            database = ProjectDatabase(
+                project_id=project_id,
+                database_name=database_name,
+                database_type=database_type
+            )
+            db.session.add(database)
+            db.session.commit()
+            flash(f'Database {database_name} linked to project', 'success')
+        else:
+            flash(f'Database {database_name} is already linked to this project', 'warning')
+    else:
+        flash('No database selected', 'danger')
+        
+    return redirect(url_for('view_project', project_id=project_id))
+
+@app.route('/projects/<int:project_id>/unlink-server/<int:server_id>', methods=['POST'])
+def unlink_server(project_id, server_id):
+    server = ProjectServer.query.get_or_404(server_id)
+    
+    # Ensure server belongs to the specified project
+    if server.project_id != project_id:
+        flash('Server does not belong to this project', 'danger')
+    else:
+        server_name = server.server_name
+        db.session.delete(server)
+        db.session.commit()
+        flash(f'Server {server_name} unlinked from project', 'success')
+        
+    return redirect(url_for('view_project', project_id=project_id))
+
+@app.route('/projects/<int:project_id>/unlink-database/<int:database_id>', methods=['POST'])
+def unlink_database(project_id, database_id):
+    database = ProjectDatabase.query.get_or_404(database_id)
+    
+    # Ensure database belongs to the specified project
+    if database.project_id != project_id:
+        flash('Database does not belong to this project', 'danger')
+    else:
+        database_name = database.database_name
+        db.session.delete(database)
+        db.session.commit()
+        flash(f'Database {database_name} unlinked from project', 'success')
+        
+    return redirect(url_for('view_project', project_id=project_id))
+
 # === Run the Application ===
 if __name__ == '__main__':
+    # Create database tables before running the app
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)

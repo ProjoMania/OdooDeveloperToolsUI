@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if task %}Edit Task{% else %}Create Task{% endif %} - {{ project.name }} - Odoo Developer Tools
+{% endblock %}
+
+{% block page_title %}
+{% if task %}Edit Task{% else %}Create New Task{% endif %} for {{ project.name }}
+{% endblock %}
+
+{% block content %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{% if task %}Edit{% else %}New{% endif %} Task</h5>
+                <div>
+                    {% if task %}
+                    <a href="{{ url_for('view_task', project_id=project.id, task_id=task.id) }}" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Task
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('project_tasks', project_id=project.id) }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-tasks me-1"></i> All Tasks
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('edit_task', project_id=project.id, task_id=task.id) if task else url_for('create_task', project_id=project.id) }}">
+                    <div class="mb-3">
+                        <label for="title" class="form-label required">Task Title</label>
+                        <input type="text" class="form-control" id="title" name="title" 
+                               value="{{ task.title if task else '' }}" required
+                               placeholder="Enter task title">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"
+                                  placeholder="Enter task description">{{ task.description if task else '' }}</textarea>
+                        <div class="form-text">Use markdown for formatting (optional)</div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="todo" {% if task and task.status == 'todo' %}selected{% endif %}>To Do</option>
+                                <option value="in_progress" {% if task and task.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="review" {% if task and task.status == 'review' %}selected{% endif %}>In Review</option>
+                                <option value="done" {% if task and task.status == 'done' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="low" {% if task and task.priority == 'low' %}selected{% endif %}>Low</option>
+                                <option value="medium" {% if task and task.priority == 'medium' %}selected{% else %}selected{% endif %}>Medium</option>
+                                <option value="high" {% if task and task.priority == 'high' %}selected{% endif %}>High</option>
+                                <option value="urgent" {% if task and task.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="due_date" class="form-label">Due Date</label>
+                        <input type="date" class="form-control" id="due_date" name="due_date" 
+                               value="{{ task.due_date.strftime('%Y-%m-%d') if task and task.due_date else '' }}">
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> {% if task %}Update{% else %}Create{% endif %} Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if task and task.notes %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Task Notes</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for note in task.notes %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <form method="post" action="{{ url_for('delete_task_note', project_id=project.id, task_id=task.id, note_id=note.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                        onclick="return confirm('Are you sure you want to delete this note?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                        <div class="mt-2">{{ note.content }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show preview of markdown content
+        const descriptionInput = document.getElementById('description');
+        if (descriptionInput) {
+            const previewContainer = document.createElement('div');
+            previewContainer.className = 'card mt-3 d-none';
+            previewContainer.innerHTML = `
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Preview</h6>
+                    <button type="button" class="btn btn-sm btn-outline-secondary hide-preview">Hide</button>
+                </div>
+                <div class="card-body preview-content"></div>
+            `;
+            
+            descriptionInput.parentNode.appendChild(previewContainer);
+            
+            const previewBtn = document.createElement('button');
+            previewBtn.type = 'button';
+            previewBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+            previewBtn.textContent = 'Preview';
+            descriptionInput.parentNode.insertBefore(previewBtn, previewContainer);
+            
+            const previewContent = previewContainer.querySelector('.preview-content');
+            const hidePreviewBtn = previewContainer.querySelector('.hide-preview');
+            
+            previewBtn.addEventListener('click', function() {
+                // For a full implementation, we would convert markdown to HTML here
+                // This is a simplified version
+                previewContent.innerHTML = '<div class="alert alert-info">Preview functionality would render markdown here</div>';
+                previewContent.innerHTML += '<p>' + descriptionInput.value.replace(/\n/g, '<br>') + '</p>';
+                previewContainer.classList.remove('d-none');
+            });
+            
+            hidePreviewBtn.addEventListener('click', function() {
+                previewContainer.classList.add('d-none');
+            });
+        }
+    });
+</script>
+{% endblock %}

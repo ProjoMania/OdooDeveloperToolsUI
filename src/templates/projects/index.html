@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}Project Management - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}Project Management{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">My Projects</h5>
+                <a href="{{ url_for('create_project') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i> New Project
+                </a>
+            </div>
+            <div class="card-body">
+                {% if projects %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Status</th>
+                                <th>Tasks</th>
+                                <th>Linked Resources</th>
+                                <th>Created</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('view_project', project_id=project.id) }}" class="fw-bold text-decoration-none">
+                                        {{ project.name }}
+                                    </a>
+                                    <div class="small text-muted text-truncate" style="max-width: 250px;">
+                                        {{ project.description|truncate(50) }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if project.status == 'active' %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% elif project.status == 'completed' %}
+                                    <span class="badge bg-primary">Completed</span>
+                                    {% elif project.status == 'archived' %}
+                                    <span class="badge bg-secondary">Archived</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set todo = project.tasks|selectattr('status', 'equalto', 'todo')|list|length %}
+                                    {% set in_progress = project.tasks|selectattr('status', 'equalto', 'in_progress')|list|length %}
+                                    {% set done = project.tasks|selectattr('status', 'equalto', 'done')|list|length %}
+                                    {% set total = project.tasks|length %}
+                                    
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                            {% if total > 0 %}
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (done / total * 100)|int }}%"></div>
+                                            {% else %}
+                                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="small">
+                                            {% if total > 0 %}
+                                            {{ (done / total * 100)|int }}%
+                                            {% else %}
+                                            0%
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="small mt-1">
+                                        <span class="text-primary">{{ total }} tasks</span>
+                                        ({{ todo }} todo, {{ in_progress }} in progress, {{ done }} done)
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span>
+                                            <i class="fas fa-server me-1 text-muted"></i> {{ project.servers|length }} servers
+                                        </span>
+                                        <span>
+                                            <i class="fas fa-database me-1 text-muted"></i> {{ project.databases|length }} databases
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ project.created_at.strftime('%Y-%m-%d') }}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('view_project', project_id=project.id) }}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           data-bs-toggle="tooltip"
+                                           title="View Project">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('edit_project', project_id=project.id) }}" 
+                                           class="btn btn-sm btn-outline-secondary"
+                                           data-bs-toggle="tooltip"
+                                           title="Edit Project">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{{ url_for('project_tasks', project_id=project.id) }}" 
+                                           class="btn btn-sm btn-outline-info"
+                                           data-bs-toggle="tooltip"
+                                           title="Manage Tasks">
+                                            <i class="fas fa-tasks"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="fas fa-project-diagram fa-4x text-muted"></i>
+                    </div>
+                    <h4>No projects yet</h4>
+                    <p class="text-muted">Create your first project to start organizing your development work.</p>
+                    <a href="{{ url_for('create_project') }}" class="btn btn-primary mt-2">
+                        <i class="fas fa-plus me-2"></i> Create Your First Project
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Project Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-4 fw-bold">{{ projects|length }}</div>
+                            <div>Total Projects</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-4 fw-bold">
+                                {% set active_count = projects|selectattr('status', 'equalto', 'active')|list|length %}
+                                {{ active_count }}
+                            </div>
+                            <div>Active Projects</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-4 fw-bold">
+                                {% set total_tasks = 0 %}
+                                {% for project in projects %}
+                                    {% set total_tasks = total_tasks + project.tasks|length %}
+                                {% endfor %}
+                                {{ total_tasks }}
+                            </div>
+                            <div>Total Tasks</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-4 fw-bold">
+                                {% set completed_tasks = 0 %}
+                                {% for project in projects %}
+                                    {% set completed_tasks = completed_tasks + project.tasks|selectattr('status', 'equalto', 'done')|list|length %}
+                                {% endfor %}
+                                {{ completed_tasks }}
+                            </div>
+                            <div>Completed Tasks</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                <ul class="list-group list-group-flush">
+                    {% for task in recent_tasks %}
+                    <li class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('view_task', project_id=task.project_id, task_id=task.id) }}" class="text-decoration-none">
+                                    {{ task.title }}
+                                </a>
+                                <div class="small text-muted">
+                                    <i class="fas fa-folder me-1"></i> {{ task.project.name }}
+                                </div>
+                            </div>
+                            <div>
+                                {% if task.status == 'todo' %}
+                                <span class="badge bg-secondary">To Do</span>
+                                {% elif task.status == 'in_progress' %}
+                                <span class="badge bg-primary">In Progress</span>
+                                {% elif task.status == 'review' %}
+                                <span class="badge bg-info">In Review</span>
+                                {% elif task.status == 'done' %}
+                                <span class="badge bg-success">Completed</span>
+                                {% endif %}
+                                <div class="small text-muted">
+                                    {{ task.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
