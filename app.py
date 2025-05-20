@@ -1009,10 +1009,17 @@ def edit_project(project_id):
     return render_template('projects/edit.html', project=project)
 
 
-@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+@app.route('/projects/<int:project_id>/delete', methods=['GET', 'POST'])
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
     
+    # If GET request, show confirmation page
+    if request.method == 'GET':
+        # Get associated tasks for display
+        tasks = Task.query.filter_by(project_id=project_id).all()
+        return render_template('projects/delete_project.html', project=project, tasks=tasks)
+    
+    # If POST request, process deletion
     # Delete all tasks associated with the project
     tasks = Task.query.filter_by(project_id=project_id).all()
     for task in tasks:
@@ -1135,18 +1142,33 @@ def edit_task(project_id, task_id):
         
     return render_template('tasks/form.html', project=project, task=task)
 
-@app.route('/projects/<int:project_id>/tasks/<int:task_id>/delete', methods=['POST'])
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/delete', methods=['GET', 'POST'])
 def delete_task(project_id, task_id):
     task = Task.query.get_or_404(task_id)
+    project = Project.query.get_or_404(project_id)
     
     # Ensure task belongs to the specified project
     if task.project_id != project_id:
         flash('Task does not belong to this project', 'danger')
         return redirect(url_for('project_tasks', project_id=project_id))
-        
+    
+    # If GET request, show confirmation page
+    if request.method == 'GET':
+        # Get associated notes for display
+        notes = TaskNote.query.filter_by(task_id=task.id).all()
+        return render_template('tasks/delete_task.html', project=project, task=task, notes=notes)
+    
+    # If POST request, process deletion
+    # Delete all notes associated with this task first
+    notes = TaskNote.query.filter_by(task_id=task.id).all()
+    for note in notes:
+        db.session.delete(note)
+    
+    # Delete the task
     db.session.delete(task)
     db.session.commit()
     flash('Task deleted successfully', 'success')
+    
     return redirect(url_for('project_tasks', project_id=project_id))
 
 @app.route('/projects/<int:project_id>/tasks/<int:task_id>/status', methods=['POST'])
