@@ -963,6 +963,44 @@ def edit_project(project_id):
                 pass
         else:
             project.end_date = None
+        
+        db.session.commit()
+        flash('Project updated successfully!', 'success')
+        return redirect(url_for('view_project', project_id=project.id))
+    
+    return render_template('projects/edit.html', project=project)
+
+
+@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    # Delete all tasks associated with the project
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    for task in tasks:
+        # Delete all notes associated with each task
+        notes = TaskNote.query.filter_by(task_id=task.id).all()
+        for note in notes:
+            db.session.delete(note)
+        db.session.delete(task)
+    
+    # Delete all server associations
+    server_associations = ProjectServer.query.filter_by(project_id=project_id).all()
+    for assoc in server_associations:
+        db.session.delete(assoc)
+    
+    # Delete all database associations
+    db_associations = ProjectDatabase.query.filter_by(project_id=project_id).all()
+    for assoc in db_associations:
+        db.session.delete(assoc)
+    
+    # Finally, delete the project itself
+    db.session.delete(project)
+    db.session.commit()
+    
+    flash('Project deleted successfully!', 'success')
+    return redirect(url_for('projects'))
+
 @app.route('/projects/<int:project_id>/tasks')
 def project_tasks(project_id):
     project = Project.query.get_or_404(project_id)

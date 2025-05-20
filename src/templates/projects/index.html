@@ -109,6 +109,37 @@
                                            title="Manage Tasks">
                                             <i class="fas fa-tasks"></i>
                                         </a>
+                                        <button type="button" 
+                                           class="btn btn-sm btn-outline-danger"
+                                           data-bs-toggle="modal"
+                                           data-bs-target="#deleteProjectModal-{{ project.id }}"
+                                           title="Delete Project">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Delete Project Modal -->
+                                    <div class="modal fade" id="deleteProjectModal-{{ project.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-danger text-white">
+                                                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete Project</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Are you sure you want to delete the project <strong>{{ project.name }}</strong>?</p>
+                                                    <p class="text-danger"><i class="fas fa-exclamation-circle me-2"></i>This will also delete all tasks, notes, and associations related to this project.</p>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <form method="POST" action="{{ url_for('delete_project', project_id=project.id) }}" class="d-inline">
+                                                        <button type="submit" class="btn btn-danger">
+                                                            <i class="fas fa-trash me-2"></i>Delete Project
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
