@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}SSH Connection - Odoo Developer Tools{% endblock %}
+
+{% block page_title %}SSH Connection{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-terminal me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
+                <h5 class="mb-0">Connecting to SSH Server</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info border-start border-4 border-info">
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
+                        </div>
+                        <div>
+                            <h6 class="alert-heading mb-1 fw-bold">Connection Information</h6>
+                            <p class="mb-0">The system is attempting to connect to the SSH server with the following command:</p>
+                            <code class="mt-2 d-block p-2 bg-light">{{ command }}</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <h6 class="mb-3">Connection Options:</h6>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card h-100 hover-effect">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-desktop me-2" style="color: var(--primary-color);"></i>
+                                        Open in Terminal
+                                    </h6>
+                                    <p class="card-text">Open your system terminal and run the command:</p>
+                                    <div class="bg-light p-2 rounded mb-3">
+                                        <code>{{ command }}</code>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-dark copy-command" data-command="{{ command }}">
+                                        <i class="fas fa-copy me-1"></i> Copy Command
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card h-100 hover-effect">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">
+                                        <i class="fas fa-keyboard me-2" style="color: var(--primary-color);"></i>
+                                        One-click Connection
+                                    </h6>
+                                    <p class="card-text">Use the button below to launch your default terminal and connect:</p>
+                                    <div class="d-grid mt-4">
+                                        <a href="ssh://{{ command|replace('ssh ', '') }}" class="btn btn-dark">
+                                            <i class="fas fa-terminal me-1"></i> Launch SSH Connection
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <a href="{{ url_for('ssh_servers') }}" class="btn btn-outline-dark">
+                        <i class="fas fa-arrow-left me-1"></i> Back to SSH Servers
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Copy command to clipboard
+    document.addEventListener('DOMContentLoaded', function() {
+        const copyButtons = document.querySelectorAll('.copy-command');
+        copyButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const command = this.getAttribute('data-command');
+                navigator.clipboard.writeText(command).then(() => {
+                    // Change button text temporarily
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                    }, 2000);
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

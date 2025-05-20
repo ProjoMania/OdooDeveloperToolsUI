@@ -246,7 +246,7 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
-@app.route('/ssh/generate_command/<host>')
+@app.route('/ssh/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
     servers = get_ssh_servers()
@@ -259,6 +259,24 @@ def generate_ssh_command(host):
     command = f"ssh {server['host']}"
     
     return jsonify({'command': command})
+
+@app.route('/ssh/connect', methods=['POST'])
+def ssh_connect():
+    """Handle SSH connection request"""
+    if request.method == 'POST':
+        command = request.form.get('command')
+        if command:
+            try:
+                # Redirect to a terminal command using the SSH command
+                # This could be customized based on your environment and terminal preferences
+                return render_template('ssh_connect.html', command=command)
+            except Exception as e:
+                flash(f'Error connecting to SSH: {str(e)}', 'error')
+                return redirect(url_for('ssh_servers'))
+    
+    # If we get here, something went wrong
+    flash('Invalid SSH connection request', 'error')
+    return redirect(url_for('ssh_servers'))
 
 # === Database Routes ===
 
