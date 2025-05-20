@@ -260,6 +260,44 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
+
+@app.route('/ssh/delete/<host>', methods=['GET', 'POST'])
+def delete_ssh_server(host):
+    """Delete an SSH server configuration"""
+    try:
+        # Build the path to the config file
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+        
+        # Check if the file exists
+        if not os.path.exists(config_file):
+            flash(f"SSH configuration for {host} not found.", "danger")
+            return redirect(url_for('ssh_servers'))
+            
+        # Get server details for display
+        servers = get_ssh_servers()
+        server = next((s for s in servers if s['host'] == host), None)
+        
+        if not server:
+            flash(f"SSH server {host} not found.", "danger")
+            return redirect(url_for('ssh_servers'))
+        
+        # If GET request, show confirmation page
+        if request.method == 'GET':
+            return render_template('delete_ssh_server.html', server=server)
+        
+        # If POST request, process deletion
+        os.remove(config_file)
+        
+        # Ensure the main SSH config includes the config.d directory
+        update_main_ssh_config()
+        
+        flash(f"SSH server {host} has been deleted successfully.", "success")
+        return redirect(url_for('ssh_servers'))
+    except Exception as e:
+        logger.error(f"Error deleting SSH server: {str(e)}")
+        flash(f"Error deleting SSH server: {str(e)}", "danger")
+        return redirect(url_for('ssh_servers'))
+
 @app.route('/ssh/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
