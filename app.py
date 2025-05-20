@@ -10,6 +10,7 @@ import re
 import zipfile
 import tempfile
 import shutil
+import glob
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
@@ -191,7 +192,9 @@ def add_ssh_server():
         hostname = request.form.get('hostname').strip()
         user = request.form.get('user').strip()
         port = request.form.get('port').strip() or "22"
-        key_file = request.form.get('key_file').strip()
+        auth_method = request.form.get('auth_method', 'key')
+        key_file = request.form.get('key_file', '').strip() if auth_method == 'key' else ''
+        password = request.form.get('password', '').strip() if auth_method == 'password' else ''
         
         # Validate inputs
         if not host or not hostname:
@@ -211,11 +214,14 @@ def add_ssh_server():
                     'hostname': hostname,
                     'user': user,
                     'port': port,
-                    'key_file': key_file
+                    'auth_method': auth_method,
+                    'key_file': key_file,
+                    'password': password
                 }
                 return render_template('ssh_add.html', overwrite=True, 
                                       host=host, hostname=hostname, 
-                                      user=user, port=port, key_file=key_file)
+                                      user=user, port=port, auth_method=auth_method,
+                                      key_file=key_file, password=password)
         
         # Write the configuration file
         with open(config_file, 'w') as f:
@@ -224,8 +230,17 @@ def add_ssh_server():
             if user:
                 f.write(f"    User {user}\n")
             f.write(f"    Port {port}\n")
-            if key_file:
+            
+            # Authentication settings
+            if auth_method == 'key' and key_file:
                 f.write(f"    IdentityFile {key_file}\n")
+                f.write(f"    PreferredAuthentications publickey\n")
+            elif auth_method == 'password' and password:
+                f.write(f"    PreferredAuthentications password\n")
+                f.write(f"    PasswordAuthentication yes\n")
+                # Store password in a safer way in a real-world application
+                # For this demo, we'll add it as a comment (NOT recommended for production)
+                f.write(f"    # Password: {password}\n")
         
         # Update main SSH config if needed
         update_main_ssh_config()
@@ -245,19 +260,61 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
-@app.route('/ssh/generate_command/<host>')
+@app.route('/ssh/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
     servers = get_ssh_servers()
-    server = next((s for s in servers if s['host'] == host), None)
     
-    if not server:
-        return jsonify({'error': 'Server not found'}), 404
+    # Find the server with matching host
+    for server in servers:
+        if server.get('host') == host:
+            # Build ssh command with appropriate flags
+            command = f"ssh {server.get('host')}"
+            
+            # Add authentication info to command response
+            auth_type = 'key' if server.get('identity_file') else 'password'
+            response = {
+                'command': command,
+                'auth_type': auth_type,
+                'host': server.get('host'),
+                'user': server.get('user', ''),
+                'hostname': server.get('hostname', '')
+            }
+            
+            return jsonify(response)
     
-    # Create the SSH command
-    command = f"ssh {server['host']}"
+    return jsonify({'error': 'Server not found'})
+
+@app.route('/ssh/connect', methods=['POST'])
+def ssh_connect():
+    # Handle SSH connection request
+    if request.method == 'POST':
+        command = request.form.get('command')
+        server_host = request.form.get('server_host', '')
+        auth_type = request.form.get('auth_type', 'key')
+        user = request.form.get('user', '')
+        hostname = request.form.get('hostname', '')
+        
+        if command:
+            try:
+                # Prepare server information for the template
+                server_info = {
+                    'host': server_host,
+                    'auth_type': auth_type,
+                    'user': user,
+                    'hostname': hostname
+                }
+                
+                # Redirect to a terminal command using the SSH command
+                # This could be customized based on your environment and terminal preferences
+                return render_template('ssh_connect.html', command=command, server_info=server_info)
+            except Exception as e:
+                flash(f'Error connecting to SSH: {str(e)}', 'error')
+                return redirect(url_for('ssh_servers'))
     
-    return jsonify({'command': command})
+    # If we get here, something went wrong
+    flash('Invalid SSH connection request', 'error')
+    return redirect(url_for('ssh_servers'))
 
 # === Database Routes ===
 
@@ -322,6 +379,22 @@ def list_databases():
                     WHERE name = 'web_enterprise' AND state = 'installed'
                 """)
                 is_enterprise = bool(db_cursor.fetchone())
+                expiration_date = None
+                # Keep the version information for Enterprise databases
+                # The Enterprise/Community status is tracked separately in is_enterprise
+                
+                # Try to get the expiration date for enterprise databases
+                if is_enterprise:
+                    try:
+                        db_cursor.execute("""
+                            SELECT value FROM ir_config_parameter
+                            WHERE key = 'database.expiration_date'
+                        """)
+                        date_row = db_cursor.fetchone()
+                        if date_row:
+                            expiration_date = date_row[0]
+                    except Exception as e:
+                        logger.error(f"Error getting expiration date for {db_name}: {str(e)}")
             else:
                 is_enterprise = False
             
@@ -339,10 +412,12 @@ def list_databases():
         else:
             filestore_size = "N/A"
         
+        # Add database to list
         databases.append({
             'name': db_name,
             'owner': owner,
             'version': odoo_version,
+            'expiration_date': expiration_date,
             'size': db_size,
             'filestore_size': filestore_size,
             'is_enterprise': is_enterprise
@@ -410,6 +485,8 @@ def restore_database():
             return redirect(request.url)
             
         if file:
+            # Check if the file is a .dump file
+            is_dump_file = file.filename.lower().endswith('.dump')
             # Get form data
             db_name = request.form.get('db_name', '').strip()
             
@@ -433,17 +510,39 @@ def restore_database():
                 # Create temp directory for extraction
                 temp_dir = tempfile.mkdtemp()
                 
-                # Extract the backup zip
-                with zipfile.ZipFile(filepath, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
-                
-                # Look for the SQL dump file
-                dump_file = os.path.join(temp_dir, "dump.sql")
-                if not os.path.exists(dump_file):
-                    flash('Invalid backup: dump.sql not found in the backup file', 'danger')
-                    shutil.rmtree(temp_dir)
-                    os.remove(filepath)
-                    return redirect(request.url)
+                # Handle direct .dump files or ZIP archives differently
+                if is_dump_file:
+                    # Use the uploaded .dump file directly
+                    dump_file = filepath
+                    dump_found = True
+                    has_filestore = False  # Direct .dump files don't have filestore
+                else:
+                    # Extract the backup zip
+                    try:
+                        with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                            zip_ref.extractall(temp_dir)
+                    except zipfile.BadZipFile:
+                        flash('The uploaded file is not a valid ZIP archive. Please upload a proper ZIP file containing SQL dump or a direct .dump file.', 'danger')
+                        shutil.rmtree(temp_dir)
+                        os.remove(filepath)
+                        return redirect(request.url)
+                    
+                    # Look for the SQL dump file (both dump.sql and *.dump formats)
+                    dump_file = os.path.join(temp_dir, "dump.sql")
+                    dump_found = os.path.exists(dump_file)
+                    
+                    # If dump.sql not found, look for *.dump files
+                    if not dump_found:
+                        dump_files = glob.glob(os.path.join(temp_dir, "*.dump"))
+                        if dump_files:
+                            dump_file = dump_files[0]  # Use the first dump file found
+                            dump_found = True
+                    
+                    if not dump_found:
+                        flash('Invalid backup: No SQL dump file (dump.sql or *.dump) found in the backup file', 'danger')
+                        shutil.rmtree(temp_dir)
+                        os.remove(filepath)
+                        return redirect(request.url)
                 
                 # Check for filestore directory or filestore.zip (for backward compatibility)
                 filestore_dir = os.path.join(temp_dir, "filestore")
@@ -543,7 +642,8 @@ def restore_database():
     return render_template('restore_database.html')
 
 @app.route('/databases/extend_enterprise', methods=['GET', 'POST'])
-def extend_enterprise():
+@app.route('/databases/extend_enterprise/<db_name>', methods=['GET', 'POST'])
+def extend_enterprise(db_name=None):
     """Extend Odoo Enterprise license expiration date for selected databases"""
     # Get enterprise databases for display in the GET request
     enterprise_dbs = []
@@ -554,15 +654,7 @@ def extend_enterprise():
         postgres_user = get_setting('postgres_user', 'postgres')
         postgres_host = get_setting('postgres_host', 'localhost')
         postgres_port = get_setting('postgres_port', '5432')
-        
-        # Debug log
-        print(f"========================USER============================")
-        print(postgres_user)
-        print(f"========================HOST============================")
-        print(postgres_host)
-        print(f"========================PORT============================")
-        print(postgres_port)
-        
+                
         conn = get_db_connection()
         if not conn:
             error_msg = 'Could not connect to PostgreSQL. Please check your database settings.'
@@ -582,7 +674,7 @@ def extend_enterprise():
     databases = [row[0] for row in cursor.fetchall() if row[0] not in ('postgres', 'template0', 'template1')]
     
     # Check each database for Odoo Enterprise
-    for db_name in databases:
+    for dbs_name in databases:
         try:
             # Use complete connection settings from the database
             postgres_user = get_setting('postgres_user', 'postgres')
@@ -593,7 +685,7 @@ def extend_enterprise():
             # Connect with appropriate parameters based on whether password is set
             if postgres_password:
                 db_conn = psycopg2.connect(
-                    dbname=db_name,
+                    dbname=dbs_name,
                     user=postgres_user,
                     password=postgres_password,
                     host=postgres_host,
@@ -601,7 +693,7 @@ def extend_enterprise():
                 )
             else:
                 db_conn = psycopg2.connect(
-                    dbname=db_name,
+                    dbname=dbs_name,
                     user=postgres_user,
                     host=postgres_host,
                     port=postgres_port
@@ -637,7 +729,7 @@ def extend_enterprise():
                     
                     # Add database to the list
                     enterprise_dbs.append({
-                        'name': db_name,
+                        'name': dbs_name,
                         'expiration_date': expiration_date
                     })
             
@@ -658,15 +750,15 @@ def extend_enterprise():
         
         if not selected_dbs:
             flash('No databases selected for extension', 'warning')
-            return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs)
+            return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs, pre_selected_db=db_name)
         
         # Extend the expiration for each selected database
-        for db_name in selected_dbs:
+        for selected_db_name in selected_dbs:
             try:
                 # Use the user settings for the database connection
                 if get_setting('postgres_password', ''):
                     db_conn = psycopg2.connect(
-                        dbname=db_name,
+                        dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         password=get_setting('postgres_password', ''),
                         host=get_setting('postgres_host', 'localhost'),
@@ -674,7 +766,7 @@ def extend_enterprise():
                     )
                 else:
                     db_conn = psycopg2.connect(
-                        dbname=db_name,
+                        dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         host=get_setting('postgres_host', 'localhost'),
                         port=get_setting('postgres_port', '5432')
@@ -721,7 +813,7 @@ def extend_enterprise():
                     """, (new_date_str,))
                 
                 results.append({
-                    'database': db_name,
+                    'database': selected_db_name,
                     'old_date': old_date,
                     'new_date': new_date_str,
                     'status': 'success'
@@ -731,7 +823,7 @@ def extend_enterprise():
                 db_conn.close()
             except Exception as e:
                 results.append({
-                    'database': db_name,
+                    'database': selected_db_name,
                     'status': 'error',
                     'message': str(e)
                 })
@@ -739,14 +831,24 @@ def extend_enterprise():
         cursor.close()
         conn.close()
         
-        if not enterprise_dbs:
-            flash('No Odoo Enterprise databases found', 'warning')
+        if not selected_dbs:
+            flash('No databases were selected for extension', 'warning')
         else:
-            flash(f'Extended license for {len(enterprise_dbs)} database(s)', 'success')
+            flash(f'Extended license for {len(selected_dbs)} database(s)', 'success')
         
         return render_template('extend_enterprise_results.html', results=results)
     
-    return render_template('extend_enterprise.html')
+    if not enterprise_dbs:
+        flash('No Odoo Enterprise databases found', 'warning')
+    
+    # If a specific database was requested, check if it's an enterprise DB
+    if db_name:
+        # Check if the specified database is in the enterprise_dbs list
+        if not any(db['name'] == db_name for db in enterprise_dbs):
+            flash(f'Database {db_name} is not an Enterprise database', 'warning')
+            return redirect(url_for('list_databases'))
+    
+    return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs, pre_selected_db=db_name)
 
 # === Project Routes ===
 @app.route('/projects')
@@ -861,6 +963,44 @@ def edit_project(project_id):
                 pass
         else:
             project.end_date = None
+        
+        db.session.commit()
+        flash('Project updated successfully!', 'success')
+        return redirect(url_for('view_project', project_id=project.id))
+    
+    return render_template('projects/edit.html', project=project)
+
+
+@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    # Delete all tasks associated with the project
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    for task in tasks:
+        # Delete all notes associated with each task
+        notes = TaskNote.query.filter_by(task_id=task.id).all()
+        for note in notes:
+            db.session.delete(note)
+        db.session.delete(task)
+    
+    # Delete all server associations
+    server_associations = ProjectServer.query.filter_by(project_id=project_id).all()
+    for assoc in server_associations:
+        db.session.delete(assoc)
+    
+    # Delete all database associations
+    db_associations = ProjectDatabase.query.filter_by(project_id=project_id).all()
+    for assoc in db_associations:
+        db.session.delete(assoc)
+    
+    # Finally, delete the project itself
+    db.session.delete(project)
+    db.session.commit()
+    
+    flash('Project deleted successfully!', 'success')
+    return redirect(url_for('projects'))
+
 @app.route('/projects/<int:project_id>/tasks')
 def project_tasks(project_id):
     project = Project.query.get_or_404(project_id)
@@ -1237,6 +1377,13 @@ def get_setting(key, default=None):
 
 # === Run the Application ===
 if __name__ == '__main__':
+    import argparse
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Odoo Developer Tools UI')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run the server on')
+    args = parser.parse_args()
+    
     # Create database tables before running the app
     with app.app_context():
         db.create_all()
@@ -1268,4 +1415,4 @@ if __name__ == '__main__':
             
             db.session.commit()
     
-    app.run(debug=True)
+    app.run(debug=True, port=args.port)

@@ -7,12 +7,22 @@
 {% block content %}
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">SSH Servers</h5>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <button id="refresh-ssh-list" class="btn btn-outline-dark me-2">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh List
+                </button>
+            </div>
+            <div>
                 <a href="{{ url_for('add_ssh_server') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus me-1"></i> Add Server
                 </a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-terminal me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
+                <h5 class="mb-0">SSH Servers</h5>
             </div>
             <div class="card-body">
                 {% if servers %}

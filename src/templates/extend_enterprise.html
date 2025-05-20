@@ -9,20 +9,30 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Extend Odoo Enterprise License</h5>
-                <a href="{{ url_for('list_databases') }}" class="btn btn-outline-secondary btn-sm">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-key me-3" style="color: var(--primary-color); font-size: 1.5rem;"></i>
+                    <h5 class="mb-0">Extend Odoo Enterprise License</h5>
+                </div>
+                <a href="{{ url_for('list_databases') }}" class="btn btn-outline-dark btn-sm">
                     <i class="fas fa-arrow-left me-1"></i> Back to Databases
                 </a>
             </div>
             <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i> 
-                    This function will extend the expiration date of selected Odoo Enterprise databases by 20 days.
+                <div class="alert alert-info border-start border-4 border-info">
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
+                        </div>
+                        <div>
+                            <h6 class="alert-heading mb-1 fw-bold">Information</h6>
+                            <p class="mb-0">This function will extend the expiration date of selected Odoo Enterprise databases by 20 days.</p>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="card mb-4">
+                <div class="card mb-4 border border-1 shadow-sm">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0">What This Does</h6>
+                        <h6 class="mb-0"><i class="fas fa-cogs me-2" style="color: var(--primary-color);"></i>What This Does</h6>
                     </div>
                     <div class="card-body">
                         <p>When you run this operation, the system will:</p>
@@ -33,9 +43,9 @@
                     </div>
                 </div>
                 
-                <div class="card mb-4">
+                <div class="card mb-4 border border-1 shadow-sm">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0">Select Databases to Extend</h6>
+                        <h6 class="mb-0"><i class="fas fa-database me-2" style="color: var(--primary-color);"></i>Select Databases to Extend</h6>
                     </div>
                     <div class="card-body">
                         {% if enterprise_dbs %}
@@ -59,9 +69,15 @@
                                 {% endfor %}
                             </div>
                         {% else %}
-                            <div class="alert alert-warning mb-0">
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                                <strong>No Odoo Enterprise databases found.</strong>
+                            <div class="alert alert-warning border-start border-4 border-warning mb-0">
+                                <div class="d-flex">
+                                    <div class="me-3">
+                                        <i class="fas fa-exclamation-circle fa-lg" style="color: var(--warning-color);"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="alert-heading mb-1 fw-bold">No Odoo Enterprise databases found</h6>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mt-3">
                                 <p>This could be due to the following reasons:</p>
@@ -70,8 +86,12 @@
                                     <li>No databases with the Odoo Enterprise module (<code>web_enterprise</code>) installed</li>
                                 </ol>
                                 
-                                <div class="alert alert-info mt-3">
-                                    <i class="fas fa-lightbulb me-2"></i>
+                                <div class="alert alert-info border-start border-4 border-info mt-3">
+                                    <div class="d-flex">
+                                        <div class="me-3">
+                                            <i class="fas fa-lightbulb fa-lg" style="color: var(--info-color);"></i>
+                                        </div>
+                                        <div>
                                     <strong>Tip:</strong> You need to install and activate the <code>web_enterprise</code> module 
                                     in your Odoo database for it to be recognized as an Enterprise database.
                                 </div>
@@ -84,32 +104,29 @@
                     <!-- Hidden database inputs will be populated via JavaScript -->
                     <div id="selected-db-inputs"></div>
                     
-                    <div class="d-grid">
-                        <button type="submit" id="extend-button" class="btn btn-primary btn-lg" {% if not enterprise_dbs %}disabled{% endif %}>
-                            <i class="fas fa-key me-1"></i> Extend Selected Licenses
-                        </button>
-                    </div>
+                    <div class="d-grid gap-2 mt-4">
+                    <button type="submit" id="submit-button" class="btn btn-dark btn-lg" disabled>
+                        <i class="fas fa-calendar-plus me-2"></i> Extend Enterprise License
+                    </button>
+                    <div class="text-center mt-2 text-muted small">Select at least one database to enable the button</div>
+                </div>
                 </form>
                 
                 <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     const selectAllCheckbox = document.getElementById('select-all-dbs');
                     const dbCheckboxes = document.querySelectorAll('.db-checkbox');
-                    const extendButton = document.getElementById('extend-button');
+                    const submitButton = document.getElementById('submit-button');
                     const selectedDbInputs = document.getElementById('selected-db-inputs');
                     const form = document.getElementById('extend-enterprise-form');
                     
                     // Function to update the button state based on selection
                     function updateButtonState() {
-                        const anySelected = Array.from(dbCheckboxes).some(cb => cb.checked);
-                        extendButton.disabled = !anySelected;
-                        
-                        if (anySelected) {
-                            extendButton.innerHTML = '<i class="fas fa-key me-1"></i> Extend ' + 
-                                Array.from(dbCheckboxes).filter(cb => cb.checked).length + 
-                                ' Selected Database(s)';
+                        const selectedDBs = Array.from(dbCheckboxes).filter(checkbox => checkbox.checked);
+                        if (selectedDBs.length > 0) {
+                            submitButton.removeAttribute('disabled');
                         } else {
-                            extendButton.innerHTML = '<i class="fas fa-key me-1"></i> Extend Selected Licenses';
+                            submitButton.setAttribute('disabled', 'disabled');
                         }
                     }
                     
@@ -126,8 +143,7 @@
                     // Individual checkbox change events
                     dbCheckboxes.forEach(checkbox => {
                         checkbox.addEventListener('change', function() {
-                            updateButtonState();
-                            
+                            updateButtonUI();
                             // Update Select All checkbox state
                             if (selectAllCheckbox) {
                                 selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
@@ -135,6 +151,22 @@
                         });
                     });
                     
+                    // Update submit button text based on selection
+                    function updateSubmitButtonText() {
+                        const selectedCount = Array.from(dbCheckboxes).filter(cb => cb.checked).length;
+                        if (selectedCount > 0) {
+                            submitButton.innerHTML = `<i class="fas fa-calendar-plus me-2"></i> Extend ${selectedCount} Selected Database(s)`;
+                        } else {
+                            submitButton.innerHTML = `<i class="fas fa-calendar-plus me-2"></i> Extend Enterprise License`;
+                        }
+                    }
+
+                    // Update both button state and text when selection changes
+                    function updateButtonUI() {
+                        updateButtonState();
+                        updateSubmitButtonText();
+                    }
+
                     // Form submission
                     form.addEventListener('submit', function(e) {
                         e.preventDefault();
@@ -142,11 +174,14 @@
                         // Clear previous inputs
                         selectedDbInputs.innerHTML = '';
                         
-                        // Add hidden inputs for selected databases
-                        const selectedDatabases = Array.from(dbCheckboxes)
-                            .filter(cb => cb.checked)
-                            .map(cb => cb.value);
-                            
+                        // Get selected databases
+                        const selectedDatabases = [];
+                        dbCheckboxes.forEach(checkbox => {
+                            if (checkbox.checked) {
+                                selectedDatabases.push(checkbox.value);
+                            }
+                        });
+                        
                         if (selectedDatabases.length === 0) {
                             alert('Please select at least one database to extend.');
                             return;
@@ -164,16 +199,81 @@
                         form.submit();
                     });
                     
-                    // Initialize button state
-                    updateButtonState();
+                    // Initialize button UI
+                    updateButtonUI();
+                    
+                    // Pre-select database if specified in URL
+                    {% if pre_selected_db %}
+                    const preSelectedDb = "{{ pre_selected_db }}";
+                    console.log("Pre-selected database:", preSelectedDb);
+                    if (preSelectedDb) {
+                        // Find and check the pre-selected database
+                        const dbCheckboxes = document.querySelectorAll('.db-checkbox');
+                        console.log("Available checkboxes:", Array.from(dbCheckboxes).map(cb => cb.value));
+                        
+                        let foundMatch = false;
+                        // Use regular for loop so we can break out of it
+                        for (let i = 0; i < dbCheckboxes.length; i++) {
+                            const checkbox = dbCheckboxes[i];
+                            console.log("Comparing", checkbox.value, "with", preSelectedDb);
+                            
+                            // Match more precisely using exact match or word boundaries
+                            const preSelectedDbLower = preSelectedDb.toLowerCase();
+                            const checkboxValueLower = checkbox.value.toLowerCase();
+                            
+                            // Split by possible separators to find exact words
+                            const preSelectedParts = preSelectedDbLower.split(/[\s_\-\.]+/);
+                            
+                            let isMatch = false;
+                            // Check for exact match first
+                            if (checkboxValueLower === preSelectedDbLower) {
+                                console.log("Exact match found!");
+                                isMatch = true;
+                            } 
+                            // Check if the database name is a whole word in the pre-selected string
+                            else if (preSelectedParts.includes(checkboxValueLower)) {
+                                console.log("Word match found in parts!");
+                                isMatch = true;
+                            }
+                            
+                            if (isMatch) {
+                                console.log("Found matching database!");
+                                checkbox.checked = true;
+                                foundMatch = true;
+                                
+                                // Scroll to the selected checkbox for better UX
+                                checkbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Stop looking for more matches
+                                break;
+                            }
+                        }
+                        
+                        if (foundMatch) {
+                            // Update the Select All checkbox if needed
+                            if (selectAllCheckbox) {
+                                selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
+                            }
+                            // Update button UI
+                            updateButtonUI();
+                        } else {
+                            console.error("Could not find database with name:", preSelectedDb);
+                        }
+                    }
+                    {% endif %}
                 });
                 </script>
                 
                 <!-- Progress bar will appear here during operation -->
                 <div class="operation-progress">
-                    <div class="operation-status">Preparing...</div>
-                    <div class="progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="operation-status fw-bold">Preparing...</div>
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
                              role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
                              style="width: 0%">0%</div>
                     </div>
@@ -186,24 +286,36 @@
 <div class="row mt-4 justify-content-center">
     <div class="col-lg-8">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-info-circle me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
                 <h5 class="mb-0">About Odoo Enterprise Licensing</h5>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <h6><i class="fas fa-question-circle me-2"></i> How Odoo Enterprise Licensing Works</h6>
+                <div class="mb-4">
+                    <h6 class="d-flex align-items-center" style="color: var(--dark-color);">
+                        <span class="badge bg-dark me-2"><i class="fas fa-question-circle"></i></span> How Odoo Enterprise Licensing Works
+                    </h6>
                     <p>Odoo Enterprise databases include an expiration date stored in the <code>ir_config_parameter</code> table with key <code>database.expiration_date</code>.</p>
                     <p>When this date is reached, certain Enterprise features become limited until the subscription is renewed.</p>
                 </div>
                 
-                <div class="mb-3">
-                    <h6><i class="fas fa-exclamation-triangle me-2 text-warning"></i> Important Note</h6>
+                <div class="mb-4">
+                    <h6 class="d-flex align-items-center" style="color: var(--dark-color);">
+                        <span class="badge me-2" style="background-color: var(--warning-color);"><i class="fas fa-exclamation-triangle"></i></span> Important Note
+                    </h6>
                     <p>This tool is meant for development and testing purposes only. For production environments, you should have a valid Odoo Enterprise subscription.</p>
                 </div>
                 
-                <div class="alert alert-secondary">
-                    <i class="fas fa-lightbulb me-2"></i> <strong>Tip:</strong> 
-                    After extending the license, you may need to restart your Odoo server for the changes to take effect.
+                <div class="alert alert-warning border-start border-4 border-warning">
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <i class="fas fa-lightbulb fa-2x" style="color: var(--primary-color);"></i>
+                        </div>
+                        <div>
+                            <h6 class="alert-heading mb-1">Pro Tip</h6>
+                            <p class="mb-0">After extending the license, you may need to restart your Odoo server for the changes to take effect.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
