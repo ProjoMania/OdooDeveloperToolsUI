@@ -188,24 +188,34 @@
 </div>
 
 <!-- Modal for migration quotation -->
-<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog">
+<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header" style="background-color: #212121; color: #fff;">
+        <div class="modal-content bg-white shadow-lg" style="border: none; border-radius: 0.75rem; overflow: hidden;">
+            <!-- Enhanced Header with Gradient -->
+            <div class="modal-header p-3" style="background: linear-gradient(135deg, #212121 0%, #333333 100%); color: #fff;">
                 <div class="d-flex align-items-center">
-                    <i class="fas fa-exchange-alt me-3" style="font-size: 1.25rem; color: #ff6600;"></i>
-                    <h5 class="modal-title mb-0">Request Migration Quotation</h5>
+                    <div class="bg-orange rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="background: #ff6600; width: 40px; height: 40px;">
+                        <i class="fas fa-exchange-alt" style="font-size: 1.1rem; color: #fff;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title mb-0 fw-bold">Request Migration Quotation</h5>
+                        <small class="text-light opacity-75">Fill out the form below to receive your custom quote</small>
+                    </div>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="alert alert-info border-start border-4 border-info mb-4">
-                    <div class="d-flex">
-                        <div class="me-3">
-                            <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
-                        </div>
-                        <div>
-                            The following information will be sent to ProjoMania to prepare your migration quotation.
+            <div class="modal-body p-4" style="background-color: #ffffff;">
+                <!-- Improved Info Box -->
+                <div class="card border-0 bg-light mb-4 shadow-sm" style="border-radius: 0.5rem; background: linear-gradient(145deg, #f8f9fa, #f0f0f0);">
+                    <div class="card-body p-3">
+                        <div class="d-flex">
+                            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; background-color: rgba(13, 110, 253, 0.1); border-radius: 50%;">
+                                <i class="fas fa-info-circle fa-lg" style="color: #0d6efd;"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold">Migration Request Information</h6>
+                                <p class="mb-0 small text-secondary">The following information will be sent to ProjoMania's migration team to prepare your custom quotation.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -213,32 +223,73 @@
                 <form id="migrationQuoteForm">
                     <input type="hidden" id="quote_db_name" name="db_name">
                     
+                    <!-- Contact Information Card First (Reordered) -->
+                    <div class="card mb-4 border-0 shadow hover-effect" style="border-radius: 0.5rem; transition: all 0.25s ease;">
+                        <div class="card-header d-flex align-items-center" style="background: linear-gradient(135deg, #212121 0%, #303030 100%); color: #fff; padding: 0.8rem 1rem;">
+                            <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(255, 102, 0, 0.2); width: 32px; height: 32px;">
+                                <i class="fas fa-user" style="color: #ff6600; font-size: 0.9rem;"></i>
+                            </div>
+                            <h6 class="mb-0 fw-bold">Your Contact Information</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="quote_contact_name" class="form-label fw-medium">Your Name <span class="text-danger">*</span></label>
+                                    <div class="input-group input-group-custom" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.5rem; overflow: hidden;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-user" style="color: #666;"></i></span>
+                                        <input type="text" class="form-control border-start-0" id="quote_contact_name" name="contact_name" placeholder="Full name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="quote_contact_email" class="form-label fw-medium">Email Address <span class="text-danger">*</span></label>
+                                    <div class="input-group input-group-custom" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.5rem; overflow: hidden;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-envelope" style="color: #666;"></i></span>
+                                        <input type="email" class="form-control border-start-0" id="quote_contact_email" name="contact_email" placeholder="email@example.com" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="quote_contact_phone" class="form-label fw-medium">Phone (optional)</label>
+                                    <div class="input-group input-group-custom" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.5rem; overflow: hidden;">
+                                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-phone" style="color: #666;"></i></span>
+                                        <input type="tel" class="form-control border-start-0" id="quote_contact_phone" name="contact_phone" placeholder="+1 (555) 000-0000">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <!-- Database Information Column -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 hover-effect">
-                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
-                                    <h6 class="mb-0"><i class="fas fa-database me-2" style="color: #ff6600;"></i>Database Information</h6>
+                        <div class="col-md-12 mb-4">
+                            <div class="card h-100 border-0 shadow hover-effect" style="border-radius: 0.5rem; transition: all 0.25s ease;">
+                                <div class="card-header d-flex align-items-center" style="background: linear-gradient(135deg, #212121 0%, #303030 100%); color: #fff; padding: 0.8rem 1rem;">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(255, 102, 0, 0.2); width: 32px; height: 32px;">
+                                        <i class="fas fa-database" style="color: #ff6600; font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 fw-bold">Database Details</h6>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body p-3">
                                     <div class="mb-3">
-                                        <label for="quote_db_version" class="form-label required">Database Version</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
-                                            <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
+                                        <label for="quote_db_version" class="form-label fw-medium">Database Version <span class="text-danger">*</span></label>
+                                        <div class="input-group input-group-custom" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.5rem; overflow: hidden;">
+                                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-code-branch" style="color: #666;"></i></span>
+                                            <input type="text" class="form-control border-start-0" id="quote_db_version" name="db_version" required>
                                         </div>
                                     </div>
-                                    <div class="mb-3 form-check">
-                                        <input type="checkbox" class="form-check-input" id="quote_is_enterprise" name="is_enterprise">
-                                        <label class="form-check-label" for="quote_is_enterprise">
-                                            <span class="badge badge-enterprise ms-1">Enterprise</span> database
-                                        </label>
-                                    </div>
+                                    
                                     <div class="mb-3">
-                                        <label class="form-label d-block">Total Records</label>
-                                        <div class="d-flex align-items-center">
-                                            <div id="recordCountDisplay" class="form-text me-2">Unknown</div>
-                                            <button type="button" class="btn btn-sm btn-outline-primary" id="fetchRecordCount">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="quote_is_enterprise" name="is_enterprise">
+                                            <label class="form-check-label" for="quote_is_enterprise">
+                                                <span class="badge" style="background-color: #875A7B; padding: 0.35em 0.65em;">Enterprise</span> edition
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-0">
+                                        <div class="d-flex align-items-center bg-light p-2 rounded">
+                                            <div id="recordCountDisplay" class="text-dark me-2 fw-medium">Unknown</div>
+                                            <button type="button" class="btn btn-sm ms-auto" id="fetchRecordCount" style="background-color: #ff6600; color: white; border-radius: 0.5rem; border: none; box-shadow: 0 2px 4px rgba(255, 102, 0, 0.2);">
                                                 <i class="fas fa-calculator me-1"></i> Calculate
                                             </button>
                                         </div>
@@ -249,108 +300,122 @@
                         </div>
                         
                         <!-- Migration Options Column -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 border-0 shadow hover-effect">
-                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
-                                    <h6 class="mb-0"><i class="fas fa-exchange-alt me-2" style="color: #ff6600;"></i>Migration Options</h6>
+                        <div class="col-md-12 mb-4">
+                            <div class="card h-100 border-0 shadow hover-effect" style="border-radius: 0.5rem; transition: all 0.25s ease;">
+                                <div class="card-header d-flex align-items-center" style="background: linear-gradient(135deg, #212121 0%, #303030 100%); color: #fff; padding: 0.8rem 1rem;">
+                                    <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="background: rgba(255, 102, 0, 0.2); width: 32px; height: 32px;">
+                                        <i class="fas fa-exchange-alt" style="color: #ff6600; font-size: 0.9rem;"></i>
+                                    </div>
+                                    <h6 class="mb-0 fw-bold">Migration Options</h6>
                                 </div>
                                 <div class="card-body p-3">
-                                    <div class="row mb-3">
-                                        <div class="col-12">
-                                            <label class="form-label fw-bold">Migration Service Type <span class="text-danger">*</span></label>
-                                            <div class="d-flex flex-wrap gap-2">
-                                                <div class="form-check me-3">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-medium">Migration Service Type <span class="text-danger">*</span></label>
+                                        <div class="row g-2 mt-1">
+                                            <div class="col-md-6">
+                                                <div class="form-check custom-radio-card p-2 border rounded" style="border-color: #e9ecef !important;">
                                                     <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_upgrading" value="upgrading" checked>
-                                                    <label class="form-check-label" for="quote_migration_upgrading">
-                                                        <i class="fas fa-arrow-up text-success me-1"></i> DB Upgrading
-                                                        <small class="d-block text-muted">Moving to higher version</small>
+                                                    <label class="form-check-label w-100" for="quote_migration_upgrading">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center bg-success-subtle" style="width: 30px; height: 30px;">
+                                                                <i class="fas fa-arrow-up" style="color: #198754;"></i>
+                                                            </div>
+                                                            <div>
+                                                                <span class="fw-medium">DB Upgrading</span>
+                                                                <small class="d-block text-muted">Moving to higher version</small>
+                                                            </div>
+                                                        </div>
                                                     </label>
                                                 </div>
-                                                <div class="form-check me-3">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check custom-radio-card p-2 border rounded" style="border-color: #e9ecef !important;">
                                                     <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_downgrading" value="downgrading">
-                                                    <label class="form-check-label" for="quote_migration_downgrading">
-                                                        <i class="fas fa-arrow-down text-warning me-1"></i> DB Downgrading
-                                                        <small class="d-block text-muted">Moving to older version</small>
+                                                    <label class="form-check-label w-100" for="quote_migration_downgrading">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center bg-warning-subtle" style="width: 30px; height: 30px;">
+                                                                <i class="fas fa-arrow-down" style="color: #ffc107;"></i>
+                                                            </div>
+                                                            <div>
+                                                                <span class="fw-medium">DB Downgrading</span>
+                                                                <small class="d-block text-muted">Moving to older version</small>
+                                                            </div>
+                                                        </div>
                                                     </label>
                                                 </div>
-                                                <div class="form-check me-3">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check custom-radio-card p-2 border rounded" style="border-color: #e9ecef !important;">
                                                     <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_merging" value="merging">
-                                                    <label class="form-check-label" for="quote_migration_merging">
-                                                        <i class="fas fa-object-group text-primary me-1"></i> DBs Merging
-                                                        <small class="d-block text-muted">Merge multiple DBs into one</small>
+                                                    <label class="form-check-label w-100" for="quote_migration_merging">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center bg-primary-subtle" style="width: 30px; height: 30px;">
+                                                                <i class="fas fa-object-group" style="color: #0d6efd;"></i>
+                                                            </div>
+                                                            <div>
+                                                                <span class="fw-medium">DBs Merging</span>
+                                                                <small class="d-block text-muted">Merge multiple DBs into one</small>
+                                                            </div>
+                                                        </div>
                                                     </label>
                                                 </div>
-                                                <div class="form-check">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check custom-radio-card p-2 border rounded" style="border-color: #e9ecef !important;">
                                                     <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_splitting" value="splitting">
-                                                    <label class="form-check-label" for="quote_migration_splitting">
-                                                        <i class="fas fa-object-ungroup text-info me-1"></i> DB Splitting
-                                                        <small class="d-block text-muted">Split multi-company DB</small>
+                                                    <label class="form-check-label w-100" for="quote_migration_splitting">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="rounded-circle p-2 me-2 d-flex align-items-center justify-content-center bg-info-subtle" style="width: 30px; height: 30px;">
+                                                                <i class="fas fa-object-ungroup" style="color: #0dcaf0;"></i>
+                                                            </div>
+                                                            <div>
+                                                                <span class="fw-medium">DB Splitting</span>
+                                                                <small class="d-block text-muted">Split multi-company DB</small>
+                                                            </div>
+                                                        </div>
                                                     </label>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="row">
+
+                                    <div class="row align-items-end mt-3">
                                         <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="quote_target_version" class="form-label">Target Version <span class="text-danger">*</span></label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
-                                                    <select class="form-select" id="quote_target_version">
-                                                        <option value="">Loading versions...</option>
-                                                    </select>
-                                                </div>
-                                                <div id="versionLoadingIndicator" class="form-text d-none">
-                                                    <i class="fas fa-spinner fa-spin me-1"></i> Loading available versions...
-                                                </div>
+                                            <label for="quote_target_version" class="form-label fw-medium">Target Version <span class="text-danger">*</span></label>
+                                            <div class="input-group input-group-custom" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.5rem; overflow: hidden;">
+                                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-code-branch" style="color: #666;"></i></span>
+                                                <select class="form-select border-start-0" id="quote_target_version">
+                                                    <option value="">Select target version</option>
+                                                </select>
+                                            </div>
+                                            <div id="versionLoadingIndicator" class="form-text d-none">
+                                                <i class="fas fa-spinner fa-spin me-1"></i> Loading available versions...
                                             </div>
                                         </div>
                                         <div class="col-md-6">
-                                            <div class="form-check mb-2">
-                                                <input class="form-check-input" type="checkbox" id="quote_need_hosting">
-                                                <label class="form-check-label" for="quote_need_hosting">
-                                                    <i class="fas fa-server text-primary me-1"></i> Need hosting
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="quote_need_support">
-                                                <label class="form-check-label" for="quote_need_support">
-                                                    <i class="fas fa-headset text-success me-1"></i> Need technical support
-                                                </label>
+                                            <div class="card bg-light border-0 h-100" style="border-radius: 0.5rem;">
+                                                <div class="card-body py-2 px-3">
+                                                    <div class="form-check form-switch mb-2">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="quote_need_hosting">
+                                                        <label class="form-check-label" for="quote_need_hosting">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-server me-2" style="color: #0d6efd;"></i>
+                                                                <span>Need hosting service</span>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="quote_need_support">
+                                                        <label class="form-check-label" for="quote_need_support">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-headset me-2" style="color: #198754;"></i>
+                                                                <span>Need technical support</span>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Contact Information Card -->
-                    <div class="card mb-4 border-0 shadow hover-effect">
-                        <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
-                            <h6 class="mb-0"><i class="fas fa-user me-2" style="color: #ff6600;"></i>Your Contact Information</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="quote_contact_name" class="form-label required">Your Name</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
-                                        <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="quote_contact_email" class="form-label required">Email Address</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                                        <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                                        <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
                                     </div>
                                 </div>
                             </div>
@@ -358,16 +423,26 @@
                     </div>
                 </form>
                 
-                <div id="quoteResponseMessage" class="alert mt-3 d-none"></div>
-                    
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i> Cancel
-                    </button>
-                    <button type="button" class="btn btn-primary" id="submitMigrationQuote" style="background-color: #ff6600; border-color: #ff6600;">
-                        <span id="quoteSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
-                        <i class="fas fa-paper-plane me-1"></i> Request Quotation
-                    </button>
+                <!-- Improved Response Message Section -->
+                <div id="quoteResponseMessage" class="d-none shadow-sm rounded my-3" style="border-left: 4px solid var(--success-color); overflow: hidden;"></div>
+                
+                <!-- Enhanced Footer -->
+                <div class="modal-footer d-flex justify-content-between align-items-center" style="background-color: #f8f9fa; border-top: 1px solid rgba(0,0,0,0.05);">
+                    <div class="small text-muted">
+                        <i class="fas fa-shield-alt me-1"></i> Your data is secure and will only be used for migration purposes
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary px-3 me-2" data-bs-dismiss="modal" style="border-radius: 0.5rem; transition: all 0.2s ease; border-color: #d1d1d1;">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </button>
+                        <button type="button" class="btn px-4 py-2" id="submitMigrationQuote" style="background: linear-gradient(135deg, #ff6600 0%, #ff8533 100%); color: white; border: none; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(255, 102, 0, 0.25); transition: all 0.25s ease;">
+                            <div class="d-flex align-items-center">
+                                <span id="quoteSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" style="width: 1rem; height: 1rem;"></span>
+                                <i class="fas fa-paper-plane me-2"></i>
+                                <span class="fw-medium">Request Quotation</span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
