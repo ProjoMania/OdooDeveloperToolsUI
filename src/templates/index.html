@@ -9,9 +9,17 @@
     <!-- Welcome Card -->
     <div class="col-lg-12">
         <div class="card">
-            <div class="card-body text-center p-5">
-                <h2 class="mb-4">Welcome to Odoo Developer Tools</h2>
+            <div class="card-body text-center p-5" style="background: linear-gradient(135deg, rgba(33,33,33,0.02) 0%, rgba(255,102,0,0.08) 100%);">
+                <h2 class="mb-4 fw-bold">Welcome to <span style="color: var(--primary-color);">Odoo</span> Developer Tools</h2>
                 <p class="lead">A modern web application to simplify Odoo development and server management tasks</p>
+                <div class="mt-4">
+                    <a href="{{ url_for('list_databases') }}" class="btn btn-dark me-2">
+                        <i class="fas fa-database me-2"></i> Databases
+                    </a>
+                    <a href="{{ url_for('ssh_servers') }}" class="btn btn-primary">
+                        <i class="fas fa-terminal me-2"></i> SSH Servers
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -25,9 +33,11 @@
                 <div class="dashboard-card-icon">
                     <i class="fas fa-terminal"></i>
                 </div>
-                <h4 class="card-title">SSH Server Management</h4>
+                <h4 class="card-title fw-semibold">SSH Server Management</h4>
                 <p class="card-text">Configure and connect to your SSH servers with ease.</p>
-                <a href="{{ url_for('ssh_servers') }}" class="btn btn-primary mt-3">Manage SSH Servers</a>
+                <a href="{{ url_for('ssh_servers') }}" class="btn btn-dark mt-3">
+                    <i class="fas fa-server me-2"></i> Manage SSH Servers
+                </a>
             </div>
         </div>
     </div>
@@ -39,9 +49,11 @@
                 <div class="dashboard-card-icon">
                     <i class="fas fa-database"></i>
                 </div>
-                <h4 class="card-title">Database Management</h4>
+                <h4 class="card-title fw-semibold">Database Management</h4>
                 <p class="card-text">List, drop, restore, and manage Odoo databases.</p>
-                <a href="{{ url_for('list_databases') }}" class="btn btn-primary mt-3">Manage Databases</a>
+                <a href="{{ url_for('list_databases') }}" class="btn btn-dark mt-3">
+                    <i class="fas fa-database me-2"></i> Manage Databases
+                </a>
             </div>
         </div>
     </div>
@@ -53,9 +65,11 @@
                 <div class="dashboard-card-icon">
                     <i class="fas fa-key"></i>
                 </div>
-                <h4 class="card-title">Enterprise License</h4>
+                <h4 class="card-title fw-semibold">Enterprise License</h4>
                 <p class="card-text">Extend Odoo Enterprise license expiration dates.</p>
-                <a href="{{ url_for('extend_enterprise') }}" class="btn btn-primary mt-3">Extend Licenses</a>
+                <a href="{{ url_for('extend_enterprise') }}" class="btn btn-dark mt-3">
+                    <i class="fas fa-calendar-plus me-2"></i> Extend Licenses
+                </a>
             </div>
         </div>
     </div>
@@ -64,30 +78,47 @@
 <div class="row mt-5">
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-link me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
                 <h5 class="mb-0">Quick Links</h5>
             </div>
             <div class="card-body">
-                <ul class="list-group">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('ssh_servers') }}" class="text-decoration-none">
-                            <i class="fas fa-list me-2"></i> List SSH Servers
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-start border-4" style="border-left-color: var(--primary-color) !important;">
+                        <a href="{{ url_for('ssh_servers') }}" class="text-decoration-none d-flex align-items-center">
+                            <span class="icon-circle bg-dark text-white me-3">
+                                <i class="fas fa-list"></i>
+                            </span>
+                            <span>List SSH Servers</span>
                         </a>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('add_ssh_server') }}" class="text-decoration-none">
-                            <i class="fas fa-plus me-2"></i> Add SSH Server
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-start border-4" style="border-left-color: var(--primary-color) !important;">
+                        <a href="{{ url_for('add_ssh_server') }}" class="text-decoration-none d-flex align-items-center">
+                            <span class="icon-circle bg-dark text-white me-3">
+                                <i class="fas fa-plus"></i>
+                            </span>
+                            <span>Add SSH Server</span>
                         </a>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('list_databases') }}" class="text-decoration-none">
-                            <i class="fas fa-list me-2"></i> List Databases
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-start border-4" style="border-left-color: var(--primary-color) !important;">
+                        <a href="{{ url_for('list_databases') }}" class="text-decoration-none d-flex align-items-center">
+                            <span class="icon-circle bg-dark text-white me-3">
+                                <i class="fas fa-list"></i>
+                            </span>
+                            <span>List Databases</span>
                         </a>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ url_for('restore_database') }}" class="text-decoration-none">
-                            <i class="fas fa-upload me-2"></i> Restore Database
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-3 border-start border-4" style="border-left-color: var(--primary-color) !important;">
+                        <a href="{{ url_for('restore_database') }}" class="text-decoration-none d-flex align-items-center">
+                            <span class="icon-circle bg-dark text-white me-3">
+                                <i class="fas fa-upload"></i>
+                            </span>
+                            <span>Restore Database</span>
                         </a>
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </li>
                 </ul>
             </div>
@@ -96,20 +127,38 @@
     
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex align-items-center">
+                <i class="fas fa-info-circle me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
                 <h5 class="mb-0">About</h5>
             </div>
             <div class="card-body">
                 <p><strong>Odoo Developer Tools</strong> is designed to make Odoo development and server management easier across Linux distributions.</p>
                 <p>This web application offers a modern interface for tasks previously handled through command-line tools.</p>
                 <h6 class="mt-4">Features:</h6>
-                <ul>
-                    <li>SSH server configuration management</li>
-                    <li>Odoo database operations (list, drop, restore)</li>
-                    <li>Enterprise license extension</li>
-                    <li>Responsive design that works across devices</li>
+                <ul class="feature-list">
+                    <li>
+                        <i class="fas fa-check-circle me-2" style="color: var(--primary-color);"></i>
+                        SSH server configuration management
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle me-2" style="color: var(--primary-color);"></i>
+                        Odoo database operations (list, drop, restore)
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle me-2" style="color: var(--primary-color);"></i>
+                        Enterprise license extension
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle me-2" style="color: var(--primary-color);"></i>
+                        Responsive design that works across devices
+                    </li>
                 </ul>
-                <p class="mt-3">Based on <a href="https://github.com/ProjoMania/OdooDeveloperTools" target="_blank">OdooDeveloperTools</a></p>
+                <div class="mt-4 p-3 bg-light rounded">
+                    <p class="mb-0">
+                        <i class="fab fa-github me-2"></i>
+                        Based on <a href="https://github.com/ProjoMania/OdooDeveloperTools" target="_blank" class="text-decoration-none" style="color: var(--primary-color);">OdooDeveloperTools</a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
