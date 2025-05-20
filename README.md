@@ -4,17 +4,51 @@ A desktop application to simplify Odoo development and server management tasks o
 
 ## Features
 
+- **Modern UI**
+  - Elegant black and orange color scheme
+  - Responsive design for various screen sizes
+  - Consistent and intuitive interface throughout the application
+  - Enhanced user experience with improved form controls and visual feedback
+
 - **SSH Server Management**
   - Add SSH server configurations
-  - List all configured SSH servers
+  - List all configured SSH servers with details
   - Connect to SSH servers with a simple interface
+  - Dedicated deletion page with confirmation to prevent accidental removal
 
 - **Odoo Database Management**
   - List all local Odoo databases with details
   - Show database size, filestore size, and Odoo version
-  - Drop databases and their filestores
+  - Drop databases and their filestores with proper confirmation
   - Restore databases from backup files
   - Extend Odoo Enterprise license expiration dates
+
+- **Project Management**
+  - Create and manage development projects
+  - Track project status and progress
+  - Link projects to SSH servers and databases
+  - Dedicated deletion page with confirmation for safe removal
+
+- **Task Management**
+  - Create tasks within projects
+  - Track task status and progress
+  - Add notes and details to tasks
+  - Dedicated deletion page for tasks
+
+## Recent Updates
+
+### UI Improvements (May 2025)
+- Implemented a modern black and orange color scheme throughout the application
+- Enhanced form controls and improved visual feedback
+- Fixed modal backdrop issues that caused screen dimming to persist
+
+### Deletion Workflow Enhancements (May 2025)
+- Replaced modal-based deletion with dedicated deletion pages for all components:
+  - SSH Server deletion pages with clear warnings and confirmations
+  - Project deletion pages that show associated data to be removed
+  - Task deletion pages with notes and metadata details
+- Improved error handling and user feedback during deletion processes
+- Unified deletion workflow across the application for consistent user experience
 
 ## Installation
 
@@ -66,6 +100,50 @@ If you prefer to install manually:
    Type=Application
    Categories=Development;Utility;" > ~/.local/share/applications/odoo-dev-tools.desktop
    ```
+
+### Install as a System Service (Autostart on Boot)
+
+To make the application start automatically at system boot, you can set it up as a systemd service:
+
+1. Create a systemd service file:
+   ```bash
+   sudo nano /etc/systemd/system/odoo-developer-tools.service
+   ```
+
+2. Add the following content (adjust paths as needed):
+   ```
+   [Unit]
+   Description=Odoo Developer Tools UI
+   After=network.target postgresql.service
+
+   [Service]
+   Type=simple
+   User=YOUR_USERNAME
+   WorkingDirectory=/path/to/OdooDeveloperToolsUI
+   ExecStart=/usr/bin/python3 /path/to/OdooDeveloperToolsUI/app.py
+   Restart=on-failure
+   RestartSec=5
+   StandardOutput=syslog
+   StandardError=syslog
+   SyslogIdentifier=odoo-dev-tools
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. Enable and start the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable odoo-developer-tools.service
+   sudo systemctl start odoo-developer-tools.service
+   ```
+
+4. Check service status:
+   ```bash
+   sudo systemctl status odoo-developer-tools.service
+   ```
+
+> **Note:** The service runs the Flask application in the background. You can access it by opening a web browser and navigating to `http://localhost:5000`
 
 ## Usage
 
