@@ -188,9 +188,9 @@
 </div>
 
 <!-- Modal for migration quotation -->
-<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog">
+<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
+        <div class="modal-content bg-white shadow-lg" style="border: none; border-radius: 0.5rem; overflow: hidden;">
             <div class="modal-header" style="background-color: #212121; color: #fff;">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-exchange-alt me-3" style="font-size: 1.25rem; color: #ff6600;"></i>
@@ -198,8 +198,8 @@
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="alert alert-info border-start border-4 border-info mb-4">
+            <div class="modal-body p-4" style="background-color: #ffffff;">
+                <div class="alert alert-info border-start border-4 border-info mb-4" style="background-color: rgba(13, 202, 240, 0.1); border-radius: 0.25rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                     <div class="d-flex">
                         <div class="me-3">
                             <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
@@ -223,7 +223,7 @@
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label for="quote_db_version" class="form-label required">Database Version</label>
-                                        <div class="input-group">
+                                        <div class="input-group" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.25rem; overflow: hidden;">
                                             <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
                                             <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
                                         </div>
@@ -250,7 +250,7 @@
                         
                         <!-- Migration Options Column -->
                         <div class="col-md-6 mb-4">
-                            <div class="card h-100 border-0 shadow hover-effect">
+                            <div class="card h-100 border-0 shadow-sm hover-effect" style="transition: all 0.3s ease; border-radius: 0.5rem;">
                                 <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
                                     <h6 class="mb-0"><i class="fas fa-exchange-alt me-2" style="color: #ff6600;"></i>Migration Options</h6>
                                 </div>
@@ -294,7 +294,7 @@
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="quote_target_version" class="form-label">Target Version <span class="text-danger">*</span></label>
-                                                <div class="input-group">
+                                                <div class="input-group" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.25rem; overflow: hidden;">
                                                     <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
                                                     <select class="form-select" id="quote_target_version">
                                                         <option value="">Loading versions...</option>
@@ -326,7 +326,7 @@
                     </div>
                     
                     <!-- Contact Information Card -->
-                    <div class="card mb-4 border-0 shadow hover-effect">
+                    <div class="card mb-4 border-0 shadow-sm hover-effect" style="transition: all 0.3s ease; border-radius: 0.5rem;">
                         <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
                             <h6 class="mb-0"><i class="fas fa-user me-2" style="color: #ff6600;"></i>Your Contact Information</h6>
                         </div>
@@ -334,21 +334,21 @@
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label for="quote_contact_name" class="form-label required">Your Name</label>
-                                    <div class="input-group">
+                                    <div class="input-group" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.25rem; overflow: hidden;">
                                         <span class="input-group-text"><i class="fas fa-user"></i></span>
                                         <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="quote_contact_email" class="form-label required">Email Address</label>
-                                    <div class="input-group">
+                                    <div class="input-group" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.25rem; overflow: hidden;">
                                         <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                         <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
-                                    <div class="input-group">
+                                    <div class="input-group" style="box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 0.25rem; overflow: hidden;">
                                         <span class="input-group-text"><i class="fas fa-phone"></i></span>
                                         <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
                                     </div>
@@ -360,11 +360,11 @@
                 
                 <div id="quoteResponseMessage" class="alert mt-3 d-none"></div>
                     
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                <div class="modal-footer" style="background-color: #f8f9fa; border-top: 1px solid rgba(0,0,0,0.05);">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 0.25rem; transition: all 0.2s ease;">
                         <i class="fas fa-times me-1"></i> Cancel
                     </button>
-                    <button type="button" class="btn btn-primary" id="submitMigrationQuote" style="background-color: #ff6600; border-color: #ff6600;">
+                    <button type="button" class="btn btn-primary" id="submitMigrationQuote" style="background-color: #ff6600; border-color: #ff6600; border-radius: 0.25rem; box-shadow: 0 2px 4px rgba(255, 102, 0, 0.2); transition: all 0.2s ease;">
                         <span id="quoteSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
                         <i class="fas fa-paper-plane me-1"></i> Request Quotation
                     </button>
