@@ -323,6 +323,20 @@ def list_databases():
                     WHERE name = 'web_enterprise' AND state = 'installed'
                 """)
                 is_enterprise = bool(db_cursor.fetchone())
+                expiration_date = None
+                if is_enterprise:
+                    odoo_version = "Enterprise"
+                    # Try to get the expiration date
+                    try:
+                        db_cursor.execute("""
+                            SELECT value FROM ir_config_parameter
+                            WHERE key = 'database.expiration_date'
+                        """)
+                        date_row = db_cursor.fetchone()
+                        if date_row:
+                            expiration_date = date_row[0]
+                    except Exception as e:
+                        logger.error(f"Error getting expiration date for {db_name}: {str(e)}")
             else:
                 is_enterprise = False
             
@@ -340,10 +354,12 @@ def list_databases():
         else:
             filestore_size = "N/A"
         
+        # Add database to list
         databases.append({
             'name': db_name,
             'owner': owner,
             'version': odoo_version,
+            'expiration_date': expiration_date,
             'size': db_size,
             'filestore_size': filestore_size,
             'is_enterprise': is_enterprise
@@ -568,7 +584,8 @@ def restore_database():
     return render_template('restore_database.html')
 
 @app.route('/databases/extend_enterprise', methods=['GET', 'POST'])
-def extend_enterprise():
+@app.route('/databases/extend_enterprise/<db_name>', methods=['GET', 'POST'])
+def extend_enterprise(db_name=None):
     """Extend Odoo Enterprise license expiration date for selected databases"""
     # Get enterprise databases for display in the GET request
     enterprise_dbs = []
@@ -579,15 +596,7 @@ def extend_enterprise():
         postgres_user = get_setting('postgres_user', 'postgres')
         postgres_host = get_setting('postgres_host', 'localhost')
         postgres_port = get_setting('postgres_port', '5432')
-        
-        # Debug log
-        print(f"========================USER============================")
-        print(postgres_user)
-        print(f"========================HOST============================")
-        print(postgres_host)
-        print(f"========================PORT============================")
-        print(postgres_port)
-        
+                
         conn = get_db_connection()
         if not conn:
             error_msg = 'Could not connect to PostgreSQL. Please check your database settings.'
@@ -683,7 +692,7 @@ def extend_enterprise():
         
         if not selected_dbs:
             flash('No databases selected for extension', 'warning')
-            return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs)
+            return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs, pre_selected_db=db_name)
         
         # Extend the expiration for each selected database
         for db_name in selected_dbs:
@@ -771,7 +780,17 @@ def extend_enterprise():
         
         return render_template('extend_enterprise_results.html', results=results)
     
-    return render_template('extend_enterprise.html')
+    if not enterprise_dbs:
+        flash('No Odoo Enterprise databases found', 'warning')
+    
+    # If a specific database was requested, check if it's an enterprise DB
+    if db_name:
+        # Check if the specified database is in the enterprise_dbs list
+        if not any(db['name'] == db_name for db in enterprise_dbs):
+            flash(f'Database {db_name} is not an Enterprise database', 'warning')
+            return redirect(url_for('list_databases'))
+    
+    return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs, pre_selected_db=db_name)
 
 # === Project Routes ===
 @app.route('/projects')
@@ -1262,6 +1281,13 @@ def get_setting(key, default=None):
 
 # === Run the Application ===
 if __name__ == '__main__':
+    import argparse
+    
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Odoo Developer Tools UI')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run the server on')
+    args = parser.parse_args()
+    
     # Create database tables before running the app
     with app.app_context():
         db.create_all()
@@ -1293,4 +1319,4 @@ if __name__ == '__main__':
             
             db.session.commit()
     
-    app.run(debug=True)
+    app.run(debug=True, port=args.port)

@@ -188,6 +188,26 @@
                     
                     // Initialize button state
                     updateButtonState();
+                    
+                    // Pre-select database if specified in URL
+                    {% if pre_selected_db %}
+                    const preSelectedDb = "{{ pre_selected_db }}";
+                    if (preSelectedDb) {
+                        // Find and check the pre-selected database
+                        const dbCheckboxes = document.querySelectorAll('.db-checkbox');
+                        dbCheckboxes.forEach(function(checkbox) {
+                            if (checkbox.value === preSelectedDb) {
+                                checkbox.checked = true;
+                                // Update the Select All checkbox if needed
+                                if (selectAllCheckbox) {
+                                    selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
+                                }
+                                // Update button state
+                                updateButtonState();
+                            }
+                        });
+                    }
+                    {% endif %}
                 });
                 </script>
                 
