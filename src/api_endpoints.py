@@ -63,6 +63,62 @@ def get_database_record_count(db_name):
         }), 500
 
 
+# API endpoint to fetch all available Odoo versions
+@api_bp.route('/odoo/versions', methods=['GET'])
+def get_odoo_versions():
+    """Fetch all available Odoo versions from GitHub using tags with pagination"""
+    try:
+        import re
+        import requests
+        
+        GITHUB_API_URL = "https://api.github.com/repos/odoo/odoo/tags"
+        NUMERIC_VERSION_PATTERN = re.compile(r'^\d+\.\d+$')
+        
+        # Get all numeric versions with pagination
+        numeric_versions = []
+        page = 1
+        
+        while True:
+            response = requests.get(GITHUB_API_URL, params={"per_page": 100, "page": page})
+            if response.status_code != 200:
+                logger.warning(f"Failed to fetch page {page} of Odoo tags: {response.status_code}")
+                break
+                
+            tags = response.json()
+            if not tags:  # Empty page means we've reached the end
+                break
+                
+            # Extract numeric versions from this page
+            for tag in tags:
+                tag_name = tag.get('name', '')
+                if NUMERIC_VERSION_PATTERN.match(tag_name):
+                    numeric_versions.append(tag_name)
+                    
+            # Move to next page
+            page += 1
+            
+            # Safety exit if too many pages (unlikely but prevents infinite loops)
+            if page > 10:  
+                logger.warning("Reached maximum page limit when fetching Odoo versions")
+                break
+        
+        # Remove duplicates (just in case)
+        numeric_versions = list(set(numeric_versions))
+        
+        # Sort versions in descending order (newest first)
+        numeric_versions.sort(reverse=True, key=lambda v: [int(x) for x in v.split('.')])
+        
+        return jsonify({
+            'success': True, 
+            'versions': numeric_versions
+        })
+    except Exception as e:
+        logger.error(f"Error fetching Odoo versions: {str(e)}")
+        return jsonify({
+            'success': False, 
+            'message': f"Failed to fetch Odoo versions: {str(e)}"
+        }), 500
+
 # API endpoint to submit a migration quotation request
 @api_bp.route('/migration/request', methods=['POST'])
 def submit_migration_request():

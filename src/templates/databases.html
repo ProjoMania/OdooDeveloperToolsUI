@@ -255,6 +255,41 @@
                                     <h6 class="mb-0"><i class="fas fa-exchange-alt me-2" style="color: #ff6600;"></i>Migration Options</h6>
                                 </div>
                                 <div class="card-body p-3">
+                                    <div class="row mb-3">
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Migration Service Type <span class="text-danger">*</span></label>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_upgrading" value="upgrading" checked>
+                                                    <label class="form-check-label" for="quote_migration_upgrading">
+                                                        <i class="fas fa-arrow-up text-success me-1"></i> DB Upgrading
+                                                        <small class="d-block text-muted">Moving to higher version</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_downgrading" value="downgrading">
+                                                    <label class="form-check-label" for="quote_migration_downgrading">
+                                                        <i class="fas fa-arrow-down text-warning me-1"></i> DB Downgrading
+                                                        <small class="d-block text-muted">Moving to older version</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_merging" value="merging">
+                                                    <label class="form-check-label" for="quote_migration_merging">
+                                                        <i class="fas fa-object-group text-primary me-1"></i> DBs Merging
+                                                        <small class="d-block text-muted">Merge multiple DBs into one</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_splitting" value="splitting">
+                                                    <label class="form-check-label" for="quote_migration_splitting">
+                                                        <i class="fas fa-object-ungroup text-info me-1"></i> DB Splitting
+                                                        <small class="d-block text-muted">Split multi-company DB</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
@@ -262,28 +297,26 @@
                                                 <div class="input-group">
                                                     <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
                                                     <select class="form-select" id="quote_target_version">
-                                                        <option value="">Select target version</option>
-                                                        <option value="16.0">Odoo 16.0</option>
-                                                        <option value="17.0">Odoo 17.0</option>
-                                                        <option value="18.0">Odoo 18.0</option>
+                                                        <option value="">Loading versions...</option>
                                                     </select>
+                                                </div>
+                                                <div id="versionLoadingIndicator" class="form-text d-none">
+                                                    <i class="fas fa-spinner fa-spin me-1"></i> Loading available versions...
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6 d-flex align-items-center">
-                                            <div class="form-check-column">
-                                                <div class="form-check mb-2">
-                                                    <input class="form-check-input" type="checkbox" id="quote_need_hosting">
-                                                    <label class="form-check-label" for="quote_need_hosting">
-                                                        <i class="fas fa-server text-primary me-1"></i> Need hosting
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="quote_need_support">
-                                                    <label class="form-check-label" for="quote_need_support">
-                                                        <i class="fas fa-headset text-success me-1"></i> Need technical support
-                                                    </label>
-                                                </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="quote_need_hosting">
+                                                <label class="form-check-label" for="quote_need_hosting">
+                                                    <i class="fas fa-server text-primary me-1"></i> Need hosting
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="quote_need_support">
+                                                <label class="form-check-label" for="quote_need_support">
+                                                    <i class="fas fa-headset text-success me-1"></i> Need technical support
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
@@ -366,20 +399,27 @@
         
         // Add target versions based on current version
         const availableVersions = [
+            {value: '19.0', label: 'Odoo 19.0'},
             {value: '18.0', label: 'Odoo 18.0'},
             {value: '17.0', label: 'Odoo 17.0'},
             {value: '16.0', label: 'Odoo 16.0'},
             {value: '15.0', label: 'Odoo 15.0'},
-            {value: '14.0', label: 'Odoo 14.0'}
+            {value: '14.0', label: 'Odoo 14.0'},
+            {value: '13.0', label: 'Odoo 13.0'},
+            {value: '12.0', label: 'Odoo 12.0'},
+            {value: '11.0', label: 'Odoo 11.0'},
+            {value: '10.0', label: 'Odoo 10.0'},
+            {value: '9.0', label: 'Odoo 9.0'},
+            {value: '8.0', label: 'Odoo 8.0'},
+            {value: '7.0', label: 'Odoo 7.0'},
         ];
         
         availableVersions.forEach(version => {
-            if (parseFloat(version.value) > currentVersion) {
-                const option = document.createElement('option');
-                option.value = version.value;
-                option.textContent = version.label;
-                targetVersionSelect.appendChild(option);
-            }
+            // Show all versions regardless of the current version
+            const option = document.createElement('option');
+            option.value = version.value;
+            option.textContent = version.label;
+            targetVersionSelect.appendChild(option);
         });
         
         // Show the modal
@@ -424,6 +464,89 @@
                 button.innerHTML = originalButtonHtml;
             });
     });
+    
+    // Handle modal open
+    $(document).on('click', '.btn-migrate', function() {
+        // Get the database name from the button
+        const dbName = $(this).data('db-name');
+        $('#quote_db_name').val(dbName);
+        
+        // Reset form
+        document.getElementById('migrationQuoteForm').reset();
+        $('#recordCountDisplay').text('Unknown');
+        
+        // Fetch available Odoo versions
+        fetchOdooVersions();
+    });
+    
+    // Function to fetch all available Odoo versions
+    function fetchOdooVersions() {
+        const versionSelect = document.getElementById('quote_target_version');
+        const loadingIndicator = document.getElementById('versionLoadingIndicator');
+        
+        // Show loading indicator
+        loadingIndicator.classList.remove('d-none');
+        versionSelect.disabled = true;
+        
+        // Call the API to get all numeric versions
+        fetch('/api/odoo/versions')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.versions && data.versions.length > 0) {
+                    // Clear existing options
+                    versionSelect.innerHTML = '<option value="">Select target version</option>';
+                    
+                    // Add all versions as options (for both upgrading and downgrading)
+                    data.versions.forEach(version => {
+                        const option = document.createElement('option');
+                        option.value = version;
+                        option.textContent = 'Odoo ' + version;
+                        versionSelect.appendChild(option);
+                    });
+                } else {
+                    // If API call fails, add comprehensive list of versions as fallback
+                    versionSelect.innerHTML = `
+                        <option value="">Select target version</option>
+                        <option value="18.0">Odoo 18.0</option>
+                        <option value="17.0">Odoo 17.0</option>
+                        <option value="16.0">Odoo 16.0</option>
+                        <option value="15.0">Odoo 15.0</option>
+                        <option value="14.0">Odoo 14.0</option>
+                        <option value="13.0">Odoo 13.0</option>
+                        <option value="12.0">Odoo 12.0</option>
+                        <option value="11.0">Odoo 11.0</option>
+                        <option value="10.0">Odoo 10.0</option>
+                        <option value="9.0">Odoo 9.0</option>
+                        <option value="8.0">Odoo 8.0</option>
+                        <option value="7.0">Odoo 7.0</option>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching Odoo versions:', error);
+                // Add comprehensive list of versions on error
+                versionSelect.innerHTML = `
+                    <option value="">Select target version</option>
+                    <option value="18.0">Odoo 18.0</option>
+                    <option value="17.0">Odoo 17.0</option>
+                    <option value="16.0">Odoo 16.0</option>
+                    <option value="15.0">Odoo 15.0</option>
+                    <option value="14.0">Odoo 14.0</option>
+                    <option value="13.0">Odoo 13.0</option>
+                    <option value="12.0">Odoo 12.0</option>
+                    <option value="11.0">Odoo 11.0</option>
+                    <option value="10.0">Odoo 10.0</option>
+                    <option value="9.0">Odoo 9.0</option>
+                    <option value="8.0">Odoo 8.0</option>
+                    <option value="7.0">Odoo 7.0</option>
+                `;
+            })
+            .finally(() => {
+                // Hide loading indicator and enable select
+                loadingIndicator.classList.add('d-none');
+                versionSelect.disabled = false;
+            });
+    }
     
     // Handle migration quotation form submission
     document.getElementById('submitMigrationQuote').addEventListener('click', function() {
@@ -480,7 +603,17 @@
         const spinner = document.getElementById('quoteSpinner');
         spinner.classList.remove('d-none');
         
-        // Add technical support option to the request data
+        // Get selected migration service type
+        const migrationTypeElements = document.getElementsByName('migration_type');
+        let selectedMigrationType = 'upgrading'; // Default
+        for (const element of migrationTypeElements) {
+            if (element.checked) {
+                selectedMigrationType = element.value;
+                break;
+            }
+        }
+        
+        // Prepare request data with migration service type
         const requestData = {
             database_info: {
                 name: document.getElementById('quote_db_name').value,
@@ -489,6 +622,7 @@
                 record_count: document.getElementById('quote_record_count').value || 0
             },
             migration_options: {
+                service_type: selectedMigrationType,
                 target_version: targetVersion,
                 need_hosting: document.getElementById('quote_need_hosting').checked,
                 need_support: document.getElementById('quote_need_support')?.checked || false
