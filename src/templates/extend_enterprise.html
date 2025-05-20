@@ -117,21 +117,16 @@
                     const selectAllCheckbox = document.getElementById('select-all-dbs');
                     const dbCheckboxes = document.querySelectorAll('.db-checkbox');
                     const submitButton = document.getElementById('submit-button');
-                    const extendButton = document.getElementById('extend-button');
                     const selectedDbInputs = document.getElementById('selected-db-inputs');
                     const form = document.getElementById('extend-enterprise-form');
                     
                     // Function to update the button state based on selection
                     function updateButtonState() {
-                        const anySelected = Array.from(dbCheckboxes).some(cb => cb.checked);
-                        extendButton.disabled = !anySelected;
-                        
-                        if (anySelected) {
-                            extendButton.innerHTML = '<i class="fas fa-key me-1"></i> Extend ' + 
-                                Array.from(dbCheckboxes).filter(cb => cb.checked).length + 
-                                ' Selected Database(s)';
+                        const selectedDBs = Array.from(dbCheckboxes).filter(checkbox => checkbox.checked);
+                        if (selectedDBs.length > 0) {
+                            submitButton.removeAttribute('disabled');
                         } else {
-                            extendButton.innerHTML = '<i class="fas fa-key me-1"></i> Extend Selected Licenses';
+                            submitButton.setAttribute('disabled', 'disabled');
                         }
                     }
                     
@@ -148,8 +143,7 @@
                     // Individual checkbox change events
                     dbCheckboxes.forEach(checkbox => {
                         checkbox.addEventListener('change', function() {
-                            updateButtonState();
-                            
+                            updateButtonUI();
                             // Update Select All checkbox state
                             if (selectAllCheckbox) {
                                 selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
@@ -157,6 +151,22 @@
                         });
                     });
                     
+                    // Update submit button text based on selection
+                    function updateSubmitButtonText() {
+                        const selectedCount = Array.from(dbCheckboxes).filter(cb => cb.checked).length;
+                        if (selectedCount > 0) {
+                            submitButton.innerHTML = `<i class="fas fa-calendar-plus me-2"></i> Extend ${selectedCount} Selected Database(s)`;
+                        } else {
+                            submitButton.innerHTML = `<i class="fas fa-calendar-plus me-2"></i> Extend Enterprise License`;
+                        }
+                    }
+
+                    // Update both button state and text when selection changes
+                    function updateButtonUI() {
+                        updateButtonState();
+                        updateSubmitButtonText();
+                    }
+
                     // Form submission
                     form.addEventListener('submit', function(e) {
                         e.preventDefault();
@@ -164,11 +174,14 @@
                         // Clear previous inputs
                         selectedDbInputs.innerHTML = '';
                         
-                        // Add hidden inputs for selected databases
-                        const selectedDatabases = Array.from(dbCheckboxes)
-                            .filter(cb => cb.checked)
-                            .map(cb => cb.value);
-                            
+                        // Get selected databases
+                        const selectedDatabases = [];
+                        dbCheckboxes.forEach(checkbox => {
+                            if (checkbox.checked) {
+                                selectedDatabases.push(checkbox.value);
+                            }
+                        });
+                        
                         if (selectedDatabases.length === 0) {
                             alert('Please select at least one database to extend.');
                             return;
@@ -186,26 +199,66 @@
                         form.submit();
                     });
                     
-                    // Initialize button state
-                    updateButtonState();
+                    // Initialize button UI
+                    updateButtonUI();
                     
                     // Pre-select database if specified in URL
                     {% if pre_selected_db %}
                     const preSelectedDb = "{{ pre_selected_db }}";
+                    console.log("Pre-selected database:", preSelectedDb);
                     if (preSelectedDb) {
                         // Find and check the pre-selected database
                         const dbCheckboxes = document.querySelectorAll('.db-checkbox');
-                        dbCheckboxes.forEach(function(checkbox) {
-                            if (checkbox.value === preSelectedDb) {
-                                checkbox.checked = true;
-                                // Update the Select All checkbox if needed
-                                if (selectAllCheckbox) {
-                                    selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
-                                }
-                                // Update button state
-                                updateButtonState();
+                        console.log("Available checkboxes:", Array.from(dbCheckboxes).map(cb => cb.value));
+                        
+                        let foundMatch = false;
+                        // Use regular for loop so we can break out of it
+                        for (let i = 0; i < dbCheckboxes.length; i++) {
+                            const checkbox = dbCheckboxes[i];
+                            console.log("Comparing", checkbox.value, "with", preSelectedDb);
+                            
+                            // Match more precisely using exact match or word boundaries
+                            const preSelectedDbLower = preSelectedDb.toLowerCase();
+                            const checkboxValueLower = checkbox.value.toLowerCase();
+                            
+                            // Split by possible separators to find exact words
+                            const preSelectedParts = preSelectedDbLower.split(/[\s_\-\.]+/);
+                            
+                            let isMatch = false;
+                            // Check for exact match first
+                            if (checkboxValueLower === preSelectedDbLower) {
+                                console.log("Exact match found!");
+                                isMatch = true;
+                            } 
+                            // Check if the database name is a whole word in the pre-selected string
+                            else if (preSelectedParts.includes(checkboxValueLower)) {
+                                console.log("Word match found in parts!");
+                                isMatch = true;
                             }
-                        });
+                            
+                            if (isMatch) {
+                                console.log("Found matching database!");
+                                checkbox.checked = true;
+                                foundMatch = true;
+                                
+                                // Scroll to the selected checkbox for better UX
+                                checkbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Stop looking for more matches
+                                break;
+                            }
+                        }
+                        
+                        if (foundMatch) {
+                            // Update the Select All checkbox if needed
+                            if (selectAllCheckbox) {
+                                selectAllCheckbox.checked = Array.from(dbCheckboxes).every(cb => cb.checked);
+                            }
+                            // Update button UI
+                            updateButtonUI();
+                        } else {
+                            console.error("Could not find database with name:", preSelectedDb);
+                        }
                     }
                     {% endif %}
                 });

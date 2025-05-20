@@ -616,7 +616,7 @@ def extend_enterprise(db_name=None):
     databases = [row[0] for row in cursor.fetchall() if row[0] not in ('postgres', 'template0', 'template1')]
     
     # Check each database for Odoo Enterprise
-    for db_name in databases:
+    for dbs_name in databases:
         try:
             # Use complete connection settings from the database
             postgres_user = get_setting('postgres_user', 'postgres')
@@ -627,7 +627,7 @@ def extend_enterprise(db_name=None):
             # Connect with appropriate parameters based on whether password is set
             if postgres_password:
                 db_conn = psycopg2.connect(
-                    dbname=db_name,
+                    dbname=dbs_name,
                     user=postgres_user,
                     password=postgres_password,
                     host=postgres_host,
@@ -635,7 +635,7 @@ def extend_enterprise(db_name=None):
                 )
             else:
                 db_conn = psycopg2.connect(
-                    dbname=db_name,
+                    dbname=dbs_name,
                     user=postgres_user,
                     host=postgres_host,
                     port=postgres_port
@@ -671,7 +671,7 @@ def extend_enterprise(db_name=None):
                     
                     # Add database to the list
                     enterprise_dbs.append({
-                        'name': db_name,
+                        'name': dbs_name,
                         'expiration_date': expiration_date
                     })
             
@@ -695,12 +695,12 @@ def extend_enterprise(db_name=None):
             return render_template('extend_enterprise.html', enterprise_dbs=enterprise_dbs, pre_selected_db=db_name)
         
         # Extend the expiration for each selected database
-        for db_name in selected_dbs:
+        for selected_db_name in selected_dbs:
             try:
                 # Use the user settings for the database connection
                 if get_setting('postgres_password', ''):
                     db_conn = psycopg2.connect(
-                        dbname=db_name,
+                        dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         password=get_setting('postgres_password', ''),
                         host=get_setting('postgres_host', 'localhost'),
@@ -708,7 +708,7 @@ def extend_enterprise(db_name=None):
                     )
                 else:
                     db_conn = psycopg2.connect(
-                        dbname=db_name,
+                        dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         host=get_setting('postgres_host', 'localhost'),
                         port=get_setting('postgres_port', '5432')
@@ -755,7 +755,7 @@ def extend_enterprise(db_name=None):
                     """, (new_date_str,))
                 
                 results.append({
-                    'database': db_name,
+                    'database': selected_db_name,
                     'old_date': old_date,
                     'new_date': new_date_str,
                     'status': 'success'
@@ -765,7 +765,7 @@ def extend_enterprise(db_name=None):
                 db_conn.close()
             except Exception as e:
                 results.append({
-                    'database': db_name,
+                    'database': selected_db_name,
                     'status': 'error',
                     'message': str(e)
                 })
@@ -773,10 +773,10 @@ def extend_enterprise(db_name=None):
         cursor.close()
         conn.close()
         
-        if not enterprise_dbs:
-            flash('No Odoo Enterprise databases found', 'warning')
+        if not selected_dbs:
+            flash('No databases were selected for extension', 'warning')
         else:
-            flash(f'Extended license for {len(enterprise_dbs)} database(s)', 'success')
+            flash(f'Extended license for {len(selected_dbs)} database(s)', 'success')
         
         return render_template('extend_enterprise_results.html', results=results)
     
