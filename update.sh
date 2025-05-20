@@ -79,14 +79,26 @@ echo -e "${GREEN}Backup created at:${NC} $BACKUP_DIR"
 # Update files - copy everything from the repo except .git directory
 echo -e "${BLUE}Updating files...${NC}"
 if [ "$IS_OPT_INSTALL" = true ]; then
-    # For /opt installation, we need sudo
-    sudo rsync -a --exclude=".git" --exclude="instance" "$TEMP_DIR/repo/" "$INSTALL_PATH/"
+    # For /opt installation, we need sudo with force overwrite
+    echo -e "${YELLOW}Copying new files to $INSTALL_PATH...${NC}"
+    sudo rsync -av --delete --exclude=".git" --exclude="instance" "$TEMP_DIR/repo/" "$INSTALL_PATH/"
+    
+    # Verify files were copied
+    echo -e "${BLUE}Verifying files were updated...${NC}"
+    ls -la "$INSTALL_PATH"
+    
     # Ensure proper permissions
+    echo -e "${BLUE}Setting correct permissions...${NC}"
     sudo chown -R "$(whoami):$(whoami)" "$INSTALL_PATH"
     sudo chmod -R 755 "$INSTALL_PATH"
 else
     # For regular installation
-    rsync -a --exclude=".git" --exclude="instance" "$TEMP_DIR/repo/" "$INSTALL_PATH/"
+    echo -e "${YELLOW}Copying new files to $INSTALL_PATH...${NC}"
+    rsync -av --delete --exclude=".git" --exclude="instance" "$TEMP_DIR/repo/" "$INSTALL_PATH/"
+    
+    # Verify files were copied
+    echo -e "${BLUE}Verifying files were updated...${NC}"
+    ls -la "$INSTALL_PATH"
 fi
 
 # Restore instance directory if it was backed up
