@@ -2,6 +2,11 @@
 
 {% block title %}Database Management - Odoo Developer Tools{% endblock %}
 
+{% block head %}
+<!-- Add Animate.css for animations -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+{% endblock %}
+
 {% block page_title %}Odoo Database Management{% endblock %}
 
 {% block content %}
@@ -184,82 +189,153 @@
 
 <!-- Modal for migration quotation -->
 <div class="modal fade" id="migrateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Request Migration Quotation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header" style="background-color: #212121; color: #fff;">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exchange-alt me-3" style="font-size: 1.25rem; color: #ff6600;"></i>
+                    <h5 class="modal-title mb-0">Request Migration Quotation</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
+                <div class="alert alert-info border-start border-4 border-info mb-4">
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
+                        </div>
+                        <div>
+                            The following information will be sent to ProjoMania to prepare your migration quotation.
+                        </div>
+                    </div>
+                </div>
+                
                 <form id="migrationQuoteForm">
                     <input type="hidden" id="quote_db_name" name="db_name">
                     
-                    <div class="database-info-section">
-                        <h6>Database Information</h6>
-                        <div class="mb-3">
-                            <label for="quote_db_version" class="form-label">Database Version</label>
-                            <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="quote_is_enterprise" name="is_enterprise">
-                            <label class="form-check-label" for="quote_is_enterprise">This is an Enterprise database</label>
-                        </div>
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center mb-1">
-                                <label class="form-label mb-0 me-2">Total Records</label>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="fetchRecordCount">
-                                    <i class="fas fa-sync-alt"></i> Calculate
-                                </button>
+                    <div class="row">
+                        <!-- Database Information Column -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 hover-effect">
+                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                                    <h6 class="mb-0"><i class="fas fa-database me-2" style="color: #ff6600;"></i>Database Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="quote_db_version" class="form-label required">Database Version</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
+                                            <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="quote_is_enterprise" name="is_enterprise">
+                                        <label class="form-check-label" for="quote_is_enterprise">
+                                            <span class="badge badge-enterprise ms-1">Enterprise</span> database
+                                        </label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label d-block">Total Records</label>
+                                        <div class="d-flex align-items-center">
+                                            <div id="recordCountDisplay" class="form-text me-2">Unknown</div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="fetchRecordCount">
+                                                <i class="fas fa-calculator me-1"></i> Calculate
+                                            </button>
+                                        </div>
+                                        <input type="hidden" id="quote_record_count" name="record_count">
+                                    </div>
+                                </div>
                             </div>
-                            <div id="recordCountDisplay" class="form-text text-muted">Click calculate to determine database size</div>
-                            <input type="hidden" id="quote_record_count" name="record_count">
+                        </div>
+                        
+                        <!-- Migration Options Column -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow hover-effect">
+                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                                    <h6 class="mb-0"><i class="fas fa-exchange-alt me-2" style="color: #ff6600;"></i>Migration Options</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="quote_target_version" class="form-label">Target Version <span class="text-danger">*</span></label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
+                                                    <select class="form-select" id="quote_target_version">
+                                                        <option value="">Select target version</option>
+                                                        <option value="16.0">Odoo 16.0</option>
+                                                        <option value="17.0">Odoo 17.0</option>
+                                                        <option value="18.0">Odoo 18.0</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 d-flex align-items-center">
+                                            <div class="form-check-column">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="quote_need_hosting">
+                                                    <label class="form-check-label" for="quote_need_hosting">
+                                                        <i class="fas fa-server text-primary me-1"></i> Need hosting
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="quote_need_support">
+                                                    <label class="form-check-label" for="quote_need_support">
+                                                        <i class="fas fa-headset text-success me-1"></i> Need technical support
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="migration-options-section mt-4">
-                        <h6>Migration Options</h6>
-                        <div class="mb-3">
-                            <label for="quote_target_version" class="form-label">Target Version</label>
-                            <select class="form-select" id="quote_target_version" name="target_version" required>
-                                <option value="">Select target version</option>
-                                <option value="18.0">Odoo 18.0</option>
-                                <option value="17.0">Odoo 17.0</option>
-                                <option value="16.0">Odoo 16.0</option>
-                                <option value="15.0">Odoo 15.0</option>
-                                <option value="14.0">Odoo 14.0</option>
-                            </select>
+                    <!-- Contact Information Card -->
+                    <div class="card mb-4 border-0 shadow hover-effect">
+                        <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                            <h6 class="mb-0"><i class="fas fa-user me-2" style="color: #ff6600;"></i>Your Contact Information</h6>
                         </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="quote_need_hosting" name="need_hosting">
-                            <label class="form-check-label" for="quote_need_hosting">I need hosting for the migrated database</label>
-                        </div>
-                    </div>
-                    
-                    <div class="contact-info-section mt-4">
-                        <h6>Your Contact Information</h6>
-                        <div class="mb-3">
-                            <label for="quote_contact_name" class="form-label">Your Name</label>
-                            <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="quote_contact_email" class="form-label">Email Address</label>
-                            <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
-                            <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_name" class="form-label required">Your Name</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                        <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_email" class="form-label required">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                        <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
                 
-                <div id="quoteResponseMessage" class="alert d-none mt-3"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="submitMigrationQuote">
-                    <span class="spinner-border spinner-border-sm d-none" id="quoteSpinner" role="status" aria-hidden="true"></span>
-                    Request Quotation
-                </button>
+                <div id="quoteResponseMessage" class="alert mt-3 d-none"></div>
+                    
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="submitMigrationQuote" style="background-color: #ff6600; border-color: #ff6600;">
+                        <span id="quoteSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
+                        <i class="fas fa-paper-plane me-1"></i> Request Quotation
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -317,8 +393,14 @@
         if (!dbName) return;
         
         // Update UI to show loading
+        const button = this;
         const displayElement = document.getElementById('recordCountDisplay');
-        displayElement.textContent = 'Calculating...';
+        
+        // Disable button and show loading state
+        button.disabled = true;
+        const originalButtonHtml = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+        displayElement.textContent = 'Calculating record count...';
         
         // Call the API endpoint
         fetch(`/api/database/${dbName}/record_count`)
@@ -326,15 +408,20 @@
             .then(data => {
                 if (data.success) {
                     const formattedCount = new Intl.NumberFormat().format(data.record_count);
-                    displayElement.textContent = `${formattedCount} records found`;
+                    displayElement.innerHTML = `<strong class="text-success">${formattedCount}</strong> records found`;
                     document.getElementById('quote_record_count').value = data.record_count;
                 } else {
-                    displayElement.textContent = 'Unable to calculate: ' + (data.message || 'Unknown error');
+                    displayElement.innerHTML = '<span class="text-warning">Unable to calculate: ' + (data.message || 'Unknown error') + '</span>';
                 }
             })
             .catch(error => {
                 console.error('Error fetching record count:', error);
-                displayElement.textContent = 'Error calculating record count. Please try again.';
+                displayElement.innerHTML = '<span class="text-danger">Error calculating record count. Please try again.</span>';
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalButtonHtml;
             });
     });
     
@@ -342,38 +429,69 @@
     document.getElementById('submitMigrationQuote').addEventListener('click', function() {
         // Get form and validate
         const form = document.getElementById('migrationQuoteForm');
+        const submitButton = this;
         const contactName = document.getElementById('quote_contact_name').value.trim();
         const contactEmail = document.getElementById('quote_contact_email').value.trim();
         const targetVersion = document.getElementById('quote_target_version').value;
+        const dbVersion = document.getElementById('quote_db_version').value.trim();
         
-        // Basic validation
-        if (!contactName || !contactEmail || !targetVersion) {
-            showResponseMessage('Please fill in all required fields (name, email, and target version).', 'danger');
+        // Reset any previous validation styles
+        resetValidationStyles();
+        
+        // Enhanced validation with visual feedback
+        let isValid = true;
+        
+        // Required fields validation
+        if (!contactName) {
+            markFieldInvalid('quote_contact_name', 'Name is required');
+            isValid = false;
+        }
+        
+        if (!contactEmail) {
+            markFieldInvalid('quote_contact_email', 'Email is required');
+            isValid = false;
+        } else {
+            // Email format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(contactEmail)) {
+                markFieldInvalid('quote_contact_email', 'Please enter a valid email address');
+                isValid = false;
+            }
+        }
+        
+        if (!targetVersion) {
+            markFieldInvalid('quote_target_version', 'Target version is required');
+            isValid = false;
+        }
+        
+        if (!dbVersion) {
+            markFieldInvalid('quote_db_version', 'Database version is required');
+            isValid = false;
+        }
+        
+        // If validation fails, show error and stop
+        if (!isValid) {
+            showResponseMessage('Please correct the errors in the form.', 'danger');
             return;
         }
         
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(contactEmail)) {
-            showResponseMessage('Please enter a valid email address.', 'danger');
-            return;
-        }
-        
-        // Show spinner
+        // Show loading state
+        submitButton.disabled = true;
         const spinner = document.getElementById('quoteSpinner');
         spinner.classList.remove('d-none');
         
-        // Prepare data for submission
+        // Add technical support option to the request data
         const requestData = {
             database_info: {
                 name: document.getElementById('quote_db_name').value,
-                current_version: document.getElementById('quote_db_version').value,
+                current_version: dbVersion,
                 is_enterprise: document.getElementById('quote_is_enterprise').checked,
                 record_count: document.getElementById('quote_record_count').value || 0
             },
             migration_options: {
                 target_version: targetVersion,
-                need_hosting: document.getElementById('quote_need_hosting').checked
+                need_hosting: document.getElementById('quote_need_hosting').checked,
+                need_support: document.getElementById('quote_need_support')?.checked || false
             },
             contact_info: {
                 name: contactName,
@@ -382,7 +500,7 @@
             }
         };
         
-        // Submit the data to the API
+        // Submit the data to the API with animated feedback
         fetch('/api/migration/request', {
             method: 'POST',
             headers: {
@@ -392,35 +510,111 @@
         })
         .then(response => response.json())
         .then(data => {
-            // Hide spinner
-            spinner.classList.add('d-none');
-            
             if (data.success) {
-                // Show success message
-                showResponseMessage(
-                    `Your migration quotation request has been submitted successfully. ` +
-                    `Reference ID: ${data.reference_id}. ProjoMania will contact you soon.`, 
-                    'success'
-                );
+                // Create success message with reference ID
+                const successMessage = `
+                    <div class="text-center mb-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
+                    </div>
+                    <h5 class="text-center mb-3">Quotation Request Submitted!</h5>
+                    <p>Your migration quotation request has been successfully submitted to ProjoMania.</p>
+                    <div class="alert alert-light border">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-tag me-2 text-primary"></i>
+                            <strong>Reference ID:</strong> 
+                            <span class="ms-2 badge bg-dark">${data.reference_id}</span>
+                        </div>
+                    </div>
+                    <p class="mt-3 mb-0">A migration specialist will contact you soon with pricing and timeline details.</p>
+                `;
                 
-                // Clear form
+                // Show nicely formatted success message
+                const responseElement = document.getElementById('quoteResponseMessage');
+                responseElement.className = 'alert alert-success mt-4';
+                responseElement.innerHTML = successMessage;
+                responseElement.classList.remove('d-none');
+                
+                // Scroll to message
+                responseElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Disable form fields to prevent resubmission
+                disableFormFields();
+                
+                // Change button to a success state
+                submitButton.innerHTML = '<i class="fas fa-check me-1"></i> Request Sent';
+                submitButton.classList.remove('btn-primary');
+                submitButton.classList.add('btn-success');
+                
+                // Auto close after delay
                 setTimeout(() => {
                     const migrateModal = bootstrap.Modal.getInstance(document.getElementById('migrateModal'));
                     migrateModal.hide();
-                    showToast('Migration quotation request submitted successfully!');
-                }, 3000);
+                    showToast('Migration quotation request submitted successfully!', 'success');
+                    
+                    // Reset button state after modal is hidden
+                    setTimeout(() => {
+                        submitButton.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Request Quotation';
+                        submitButton.classList.remove('btn-success');
+                        submitButton.classList.add('btn-primary');
+                        submitButton.disabled = false;
+                        spinner.classList.add('d-none');
+                        resetFormFields();
+                    }, 500);
+                }, 4000);
             } else {
                 // Show error message
-                showResponseMessage('Error submitting request: ' + (data.message || 'Unknown error'), 'danger');
+                showResponseMessage(`<i class="fas fa-exclamation-triangle me-2"></i> Error submitting request: ${data.message || 'Unknown error'}`, 'danger');
+                submitButton.disabled = false;
+                spinner.classList.add('d-none');
             }
         })
         .catch(error => {
-            // Hide spinner
-            spinner.classList.add('d-none');
             console.error('Error submitting migration request:', error);
-            showResponseMessage('Failed to submit migration request. Please try again later.', 'danger');
+            showResponseMessage(`<i class="fas fa-exclamation-circle me-2"></i> Network error: Failed to submit migration request. Please try again later.`, 'danger');
+            submitButton.disabled = false;
+            spinner.classList.add('d-none');
         });
     });
+    
+    // Form validation helper functions
+    function markFieldInvalid(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        field.classList.add('is-invalid');
+        
+        // Add validation message if it doesn't exist
+        let feedbackElement = field.nextElementSibling;
+        if (!feedbackElement || !feedbackElement.classList.contains('invalid-feedback')) {
+            feedbackElement = document.createElement('div');
+            feedbackElement.className = 'invalid-feedback';
+            field.parentNode.insertBefore(feedbackElement, field.nextSibling);
+        }
+        feedbackElement.textContent = message;
+    }
+    
+    function resetValidationStyles() {
+        // Clear all validation styles
+        const invalidFields = document.querySelectorAll('.is-invalid');
+        invalidFields.forEach(field => field.classList.remove('is-invalid'));
+        
+        // Hide any existing validation messages
+        document.getElementById('quoteResponseMessage').classList.add('d-none');
+    }
+    
+    function disableFormFields() {
+        // Disable all form fields to prevent changes after submission
+        const form = document.getElementById('migrationQuoteForm');
+        const fields = form.querySelectorAll('input, select, textarea, button');
+        fields.forEach(field => field.disabled = true);
+    }
+    
+    function resetFormFields() {
+        // Reset and enable all form fields
+        const form = document.getElementById('migrationQuoteForm');
+        form.reset();
+        const fields = form.querySelectorAll('input, select, textarea, button');
+        fields.forEach(field => field.disabled = false);
+        resetValidationStyles();
+    }
     
     // Helper function to show response messages in the modal
     function showResponseMessage(message, type) {
@@ -431,16 +625,28 @@
         messageElement.classList.remove('d-none');
     }
     
-    // Helper function to show toast notifications
-    function showToast(message) {
+    // Helper function to show toast notifications with different types (success, danger, warning, info)
+    function showToast(message, type = 'info') {
         // Create toast container if it doesn't exist
         let toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.id = 'toast-container';
             toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+            toastContainer.style.zIndex = '9999';
             document.body.appendChild(toastContainer);
         }
+        
+        // Map type to icon and color
+        const typeConfig = {
+            success: { icon: 'fa-check-circle', color: 'var(--success-color)' },
+            danger: { icon: 'fa-exclamation-circle', color: 'var(--danger-color)' },
+            warning: { icon: 'fa-exclamation-triangle', color: 'var(--warning-color)' },
+            info: { icon: 'fa-info-circle', color: 'var(--info-color)' },
+            primary: { icon: 'fa-bell', color: 'var(--primary-color)' }
+        };
+        
+        const config = typeConfig[type] || typeConfig.info;
         
         // Create toast element
         const toastId = 'toast-' + Date.now();
@@ -450,10 +656,21 @@
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
+        toast.style.borderLeft = `4px solid ${config.color}`;
+        toast.style.boxShadow = 'var(--shadow-lg)';
+        
+        // Define header text based on type
+        let headerText = 'Notification';
+        if (type === 'success') headerText = 'Success';
+        if (type === 'danger') headerText = 'Error';
+        if (type === 'warning') headerText = 'Warning';
+        if (type === 'info') headerText = 'Information';
         
         toast.innerHTML = `
             <div class="toast-header">
-                <strong class="me-auto">Notification</strong>
+                <i class="fas ${config.icon} me-2" style="color: ${config.color}"></i>
+                <strong class="me-auto">${headerText}</strong>
+                <small>just now</small>
                 <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
             <div class="toast-body">
@@ -461,15 +678,23 @@
             </div>
         `;
         
-        // Add to container
-        toastContainer.appendChild(toast);
+        // Add animation class
+        toast.classList.add('animate__animated', 'animate__fadeInUp');
+        
+        // Add to container (at the beginning so newest is on top)
+        toastContainer.prepend(toast);
         
         // Auto dismiss after 5 seconds
         setTimeout(() => {
-            const bsToast = new bootstrap.Toast(toast);
-            bsToast.hide();
+            toast.classList.replace('animate__fadeInUp', 'animate__fadeOutRight');
             setTimeout(() => toast.remove(), 500);
         }, 5000);
+        
+        // Add click to dismiss
+        toast.addEventListener('click', function() {
+            toast.classList.replace('animate__fadeInUp', 'animate__fadeOutRight');
+            setTimeout(() => toast.remove(), 500);
+        });
     }
 </script>
 {% endblock %}
