@@ -65,6 +65,91 @@ detect_distro() {
     echo $DISTRO
 }
 
+# Function to create and setup systemd service
+setup_systemd_service() {
+    echo -e "${BLUE}Setting up systemd service for auto-start on boot...${NC}"
+    
+    # Get current username
+    CURRENT_USER=$(whoami)
+    
+    # Determine install location - automatically choose /opt for system service
+    echo -e "${BLUE}Installing to system directory...${NC}"
+    INSTALL_DIR="/opt/odoo-developer-tools"
+    echo -e "${YELLOW}Installing to $INSTALL_DIR...${NC}"
+    
+    # Create the directory and copy files
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo cp -r "$SCRIPT_DIR/"* "$INSTALL_DIR/"
+    sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
+    sudo chmod -R 755 "$INSTALL_DIR"
+    echo -e "${GREEN}Files copied to $INSTALL_DIR${NC}"
+    
+    # Update application path
+    APP_DIR="$INSTALL_DIR"
+    
+    # Create service file
+    echo -e "${YELLOW}Creating service file...${NC}"
+    
+    # Service file content
+    SERVICE_CONTENT="[Unit]\n"
+    SERVICE_CONTENT+="Description=Odoo Developer Tools UI\n"
+    SERVICE_CONTENT+="After=network.target postgresql.service\n\n"
+    SERVICE_CONTENT+="[Service]\n"
+    SERVICE_CONTENT+="Type=simple\n"
+    SERVICE_CONTENT+="User=$CURRENT_USER\n"
+    SERVICE_CONTENT+="WorkingDirectory=$APP_DIR\n"
+    SERVICE_CONTENT+="ExecStart=/usr/bin/python3 $APP_DIR/app.py\n"
+    SERVICE_CONTENT+="Restart=on-failure\n"
+    SERVICE_CONTENT+="RestartSec=5\n"
+    SERVICE_CONTENT+="StandardOutput=syslog\n"
+    SERVICE_CONTENT+="StandardError=syslog\n"
+    SERVICE_CONTENT+="SyslogIdentifier=odoo-dev-tools\n\n"
+    SERVICE_CONTENT+="[Install]\n"
+    SERVICE_CONTENT+="WantedBy=multi-user.target\n"
+    
+    # Use sudo to write the service file
+    echo -e "$SERVICE_CONTENT" | sudo tee /etc/systemd/system/odoo-developer-tools.service > /dev/null
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to create service file. Make sure you have sudo privileges.${NC}"
+        return 1
+    fi
+    
+    # Update the desktop file for the new location
+    echo -e "${YELLOW}Updating desktop shortcut for new location...${NC}"
+    mkdir -p "$HOME/.local/share/applications"
+    cat > "$HOME/.local/share/applications/odoo-dev-tools.desktop" << EOF
+[Desktop Entry]
+Name=Odoo Developer Tools
+Comment=Tools for Odoo development and server management
+Exec="$APP_DIR/app.py"
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+EOF
+    chmod +x "$HOME/.local/share/applications/odoo-dev-tools.desktop"
+    echo -e "${GREEN}Desktop shortcut updated.${NC}"
+    
+    # Reload systemd, enable and start the service
+    echo -e "${YELLOW}Enabling and starting the service...${NC}"
+    sudo systemctl daemon-reload
+    sudo systemctl enable odoo-developer-tools.service
+    sudo systemctl start odoo-developer-tools.service
+    
+    # Check if service started successfully
+    if sudo systemctl is-active --quiet odoo-developer-tools.service; then
+        echo -e "${GREEN}Service has been started successfully.${NC}"
+        echo -e "${GREEN}The application will now start automatically on system boot.${NC}"
+        echo -e "${GREEN}Application has been installed to: $APP_DIR${NC}"
+        echo -e "${YELLOW}Access the application at: http://localhost:5000${NC}"
+        return 0
+    else
+        echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
+        return 1
+    fi
+}
+
 # Install dependencies based on distribution
 install_dependencies() {
     local distro=$(detect_distro)
@@ -173,14 +258,30 @@ else
     echo -e "${GREEN}SSH config already includes config.d directory.${NC}"
 fi
 
+# Set up the service automatically
+echo
+echo -e "${BLUE}Setting up the application as a system service...${NC}"
+# Install as a service
+setup_systemd_service
+SERVICE_RESULT=$?
+
 # All done
 echo
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}     Installation Complete!          ${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo
-echo -e "You can now run the Odoo Developer Tools UI:"
-echo -e "  1. From your desktop applications menu"
-echo -e "  2. By running ${BLUE}$SCRIPT_DIR/main.py${NC}"
+
+if [ $SERVICE_RESULT -eq 0 ]; then
+    echo -e "You can access the Odoo Developer Tools UI:"
+    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://localhost:5000${NC}"
+    echo -e "  2. The service will start automatically when your system boots"
+    echo -e "  3. To control the service: ${YELLOW}sudo systemctl [start|stop|restart|status] odoo-developer-tools.service${NC}"
+else
+    echo -e "Service setup failed. You can still run the Odoo Developer Tools UI:"
+    echo -e "  1. From your desktop applications menu"
+    echo -e "  2. By running ${BLUE}$SCRIPT_DIR/main.py${NC}"
+fi
+
 echo
 echo -e "Enjoy using Odoo Developer Tools UI!"
