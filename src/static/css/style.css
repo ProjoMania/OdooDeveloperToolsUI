@@ -504,3 +504,78 @@ a {
         opacity: 1;
     }
 }
+
+/* Modal styling */
+.modal-header {
+    background-color: var(--secondary-bg-color);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-footer {
+    background-color: var(--secondary-bg-color);
+    border-top: 1px solid var(--border-color);
+}
+
+.modal-content {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+/* Migration Quotation Modal Styling */
+.database-info-section, .migration-options-section, .contact-info-section {
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: var(--secondary-color);
+    border-left: 4px solid var(--primary-color);
+}
+
+/* Toast Notifications */
+#toast-container {
+    z-index: 1056;
+}
+
+.toast {
+    background-color: white;
+    color: var(--text-color);
+    border-left: 4px solid var(--primary-color);
+    box-shadow: var(--shadow);
+}
+
+.toast .toast-header {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Mode Styles */
+[data-theme="dark"] .modal-content {
+    background-color: var(--dark-color-light);
+    color: var(--text-light);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+    background-color: var(--dark-color);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .database-info-section,
+[data-theme="dark"] .migration-options-section,
+[data-theme="dark"] .contact-info-section {
+    background-color: var(--dark-color);
+}
+
+[data-theme="dark"] .toast {
+    background-color: var(--dark-color-light);
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .toast .toast-header {
+    background-color: var(--dark-color);
+    color: var(--text-light);
+    border-color: rgba(255, 255, 255, 0.1);
+}

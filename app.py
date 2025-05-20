@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # Developer Management Tool - Comprehensive developer workspace management
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+import requests
 import os
 import psycopg2
 import paramiko
+from src.api_endpoints import api_bp
 import subprocess
 import json
 import re
@@ -29,6 +31,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
 db.init_app(app)
+
+# Register API blueprint
+app.register_blueprint(api_bp)
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -1434,6 +1439,17 @@ def get_setting(key, default=None):
     if setting:
         return setting.value
     return default
+
+# Function to get database connection parameters
+def get_connection_params():
+    """Get PostgreSQL connection parameters from settings"""
+    # Get connection parameters with defaults
+    return {
+        'user': get_setting('postgres_user', 'postgres'),
+        'password': get_setting('postgres_password', ''),
+        'host': get_setting('postgres_host', 'localhost'),
+        'port': get_setting('postgres_port', '5432')
+    }
 
 # === Run the Application ===
 if __name__ == '__main__':

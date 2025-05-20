@@ -74,10 +74,17 @@
                                             <i class="fas fa-key"></i>
                                         </a>
                                         {% endif %}
+                                        <button type="button"
+                                           class="btn btn-sm btn-primary me-1"
+                                           data-bs-toggle="tooltip"
+                                           title="Request Migration Quote for {{ db.name }}"
+                                           onclick="prepareMigrationRequest('{{ db.name }}', '{{ db.version }}', {{ db.is_enterprise|lower }})">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
                                         <a href="{{ url_for('drop_database', db_name=db.name) }}" 
                                            class="btn btn-sm btn-danger"
                                            data-bs-toggle="tooltip"
-                                           title="Drop Database">
+                                           title="Drop {{ db.name }}">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -174,4 +181,298 @@
         </div>
     </div>
 </div>
+
+<!-- Modal for migration quotation -->
+<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Request Migration Quotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="migrationQuoteForm">
+                    <input type="hidden" id="quote_db_name" name="db_name">
+                    
+                    <div class="database-info-section">
+                        <h6>Database Information</h6>
+                        <div class="mb-3">
+                            <label for="quote_db_version" class="form-label">Database Version</label>
+                            <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="quote_is_enterprise" name="is_enterprise">
+                            <label class="form-check-label" for="quote_is_enterprise">This is an Enterprise database</label>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center mb-1">
+                                <label class="form-label mb-0 me-2">Total Records</label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="fetchRecordCount">
+                                    <i class="fas fa-sync-alt"></i> Calculate
+                                </button>
+                            </div>
+                            <div id="recordCountDisplay" class="form-text text-muted">Click calculate to determine database size</div>
+                            <input type="hidden" id="quote_record_count" name="record_count">
+                        </div>
+                    </div>
+                    
+                    <div class="migration-options-section mt-4">
+                        <h6>Migration Options</h6>
+                        <div class="mb-3">
+                            <label for="quote_target_version" class="form-label">Target Version</label>
+                            <select class="form-select" id="quote_target_version" name="target_version" required>
+                                <option value="">Select target version</option>
+                                <option value="18.0">Odoo 18.0</option>
+                                <option value="17.0">Odoo 17.0</option>
+                                <option value="16.0">Odoo 16.0</option>
+                                <option value="15.0">Odoo 15.0</option>
+                                <option value="14.0">Odoo 14.0</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="quote_need_hosting" name="need_hosting">
+                            <label class="form-check-label" for="quote_need_hosting">I need hosting for the migrated database</label>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-info-section mt-4">
+                        <h6>Your Contact Information</h6>
+                        <div class="mb-3">
+                            <label for="quote_contact_name" class="form-label">Your Name</label>
+                            <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="quote_contact_email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
+                            <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
+                        </div>
+                    </div>
+                </form>
+                
+                <div id="quoteResponseMessage" class="alert d-none mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitMigrationQuote">
+                    <span class="spinner-border spinner-border-sm d-none" id="quoteSpinner" role="status" aria-hidden="true"></span>
+                    Request Quotation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Function to prepare and show the migration request modal
+    function prepareMigrationRequest(dbName, dbVersion, isEnterprise) {
+        // Reset form and messages
+        const form = document.getElementById('migrationQuoteForm');
+        form.reset();
+        document.getElementById('quoteResponseMessage').classList.add('d-none');
+        document.getElementById('quoteSpinner').classList.add('d-none');
+        document.getElementById('recordCountDisplay').textContent = 'Click calculate to determine database size';
+        
+        // Populate the hidden fields
+        document.getElementById('quote_db_name').value = dbName;
+        document.getElementById('quote_db_version').value = dbVersion || '';
+        document.getElementById('quote_is_enterprise').checked = isEnterprise || false;
+        
+        // Set appropriate target version options based on current version
+        const currentVersion = parseFloat(dbVersion || '0.0');
+        const targetVersionSelect = document.getElementById('quote_target_version');
+        
+        // Clear previous options except the empty first option
+        targetVersionSelect.innerHTML = '<option value="">Select target version</option>';
+        
+        // Add target versions based on current version
+        const availableVersions = [
+            {value: '18.0', label: 'Odoo 18.0'},
+            {value: '17.0', label: 'Odoo 17.0'},
+            {value: '16.0', label: 'Odoo 16.0'},
+            {value: '15.0', label: 'Odoo 15.0'},
+            {value: '14.0', label: 'Odoo 14.0'}
+        ];
+        
+        availableVersions.forEach(version => {
+            if (parseFloat(version.value) > currentVersion) {
+                const option = document.createElement('option');
+                option.value = version.value;
+                option.textContent = version.label;
+                targetVersionSelect.appendChild(option);
+            }
+        });
+        
+        // Show the modal
+        const migrateModal = new bootstrap.Modal(document.getElementById('migrateModal'));
+        migrateModal.show();
+    }
+    
+    // Function to fetch the record count from the database
+    document.getElementById('fetchRecordCount').addEventListener('click', function() {
+        const dbName = document.getElementById('quote_db_name').value;
+        if (!dbName) return;
+        
+        // Update UI to show loading
+        const displayElement = document.getElementById('recordCountDisplay');
+        displayElement.textContent = 'Calculating...';
+        
+        // Call the API endpoint
+        fetch(`/api/database/${dbName}/record_count`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const formattedCount = new Intl.NumberFormat().format(data.record_count);
+                    displayElement.textContent = `${formattedCount} records found`;
+                    document.getElementById('quote_record_count').value = data.record_count;
+                } else {
+                    displayElement.textContent = 'Unable to calculate: ' + (data.message || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching record count:', error);
+                displayElement.textContent = 'Error calculating record count. Please try again.';
+            });
+    });
+    
+    // Handle migration quotation form submission
+    document.getElementById('submitMigrationQuote').addEventListener('click', function() {
+        // Get form and validate
+        const form = document.getElementById('migrationQuoteForm');
+        const contactName = document.getElementById('quote_contact_name').value.trim();
+        const contactEmail = document.getElementById('quote_contact_email').value.trim();
+        const targetVersion = document.getElementById('quote_target_version').value;
+        
+        // Basic validation
+        if (!contactName || !contactEmail || !targetVersion) {
+            showResponseMessage('Please fill in all required fields (name, email, and target version).', 'danger');
+            return;
+        }
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(contactEmail)) {
+            showResponseMessage('Please enter a valid email address.', 'danger');
+            return;
+        }
+        
+        // Show spinner
+        const spinner = document.getElementById('quoteSpinner');
+        spinner.classList.remove('d-none');
+        
+        // Prepare data for submission
+        const requestData = {
+            database_info: {
+                name: document.getElementById('quote_db_name').value,
+                current_version: document.getElementById('quote_db_version').value,
+                is_enterprise: document.getElementById('quote_is_enterprise').checked,
+                record_count: document.getElementById('quote_record_count').value || 0
+            },
+            migration_options: {
+                target_version: targetVersion,
+                need_hosting: document.getElementById('quote_need_hosting').checked
+            },
+            contact_info: {
+                name: contactName,
+                email: contactEmail,
+                phone: document.getElementById('quote_contact_phone').value.trim()
+            }
+        };
+        
+        // Submit the data to the API
+        fetch('/api/migration/request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide spinner
+            spinner.classList.add('d-none');
+            
+            if (data.success) {
+                // Show success message
+                showResponseMessage(
+                    `Your migration quotation request has been submitted successfully. ` +
+                    `Reference ID: ${data.reference_id}. ProjoMania will contact you soon.`, 
+                    'success'
+                );
+                
+                // Clear form
+                setTimeout(() => {
+                    const migrateModal = bootstrap.Modal.getInstance(document.getElementById('migrateModal'));
+                    migrateModal.hide();
+                    showToast('Migration quotation request submitted successfully!');
+                }, 3000);
+            } else {
+                // Show error message
+                showResponseMessage('Error submitting request: ' + (data.message || 'Unknown error'), 'danger');
+            }
+        })
+        .catch(error => {
+            // Hide spinner
+            spinner.classList.add('d-none');
+            console.error('Error submitting migration request:', error);
+            showResponseMessage('Failed to submit migration request. Please try again later.', 'danger');
+        });
+    });
+    
+    // Helper function to show response messages in the modal
+    function showResponseMessage(message, type) {
+        const messageElement = document.getElementById('quoteResponseMessage');
+        messageElement.textContent = message;
+        messageElement.className = 'alert mt-3';
+        messageElement.classList.add(`alert-${type}`);
+        messageElement.classList.remove('d-none');
+    }
+    
+    // Helper function to show toast notifications
+    function showToast(message) {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast element
+        const toastId = 'toast-' + Date.now();
+        const toast = document.createElement('div');
+        toast.className = 'toast show';
+        toast.id = toastId;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        toast.innerHTML = `
+            <div class="toast-header">
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+        
+        // Add to container
+        toastContainer.appendChild(toast);
+        
+        // Auto dismiss after 5 seconds
+        setTimeout(() => {
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.hide();
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+    }
+</script>
+{% endblock %}
+
+
 {% endblock %}
