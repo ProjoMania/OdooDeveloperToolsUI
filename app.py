@@ -380,9 +380,11 @@ def list_databases():
                 """)
                 is_enterprise = bool(db_cursor.fetchone())
                 expiration_date = None
+                # Keep the version information for Enterprise databases
+                # The Enterprise/Community status is tracked separately in is_enterprise
+                
+                # Try to get the expiration date for enterprise databases
                 if is_enterprise:
-                    odoo_version = "Enterprise"
-                    # Try to get the expiration date
                     try:
                         db_cursor.execute("""
                             SELECT value FROM ir_config_parameter
