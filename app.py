@@ -260,6 +260,44 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
+
+@app.route('/ssh/delete/<host>', methods=['GET', 'POST'])
+def delete_ssh_server(host):
+    """Delete an SSH server configuration"""
+    try:
+        # Build the path to the config file
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+        
+        # Check if the file exists
+        if not os.path.exists(config_file):
+            flash(f"SSH configuration for {host} not found.", "danger")
+            return redirect(url_for('ssh_servers'))
+            
+        # Get server details for display
+        servers = get_ssh_servers()
+        server = next((s for s in servers if s['host'] == host), None)
+        
+        if not server:
+            flash(f"SSH server {host} not found.", "danger")
+            return redirect(url_for('ssh_servers'))
+        
+        # If GET request, show confirmation page
+        if request.method == 'GET':
+            return render_template('delete_ssh_server.html', server=server)
+        
+        # If POST request, process deletion
+        os.remove(config_file)
+        
+        # Ensure the main SSH config includes the config.d directory
+        update_main_ssh_config()
+        
+        flash(f"SSH server {host} has been deleted successfully.", "success")
+        return redirect(url_for('ssh_servers'))
+    except Exception as e:
+        logger.error(f"Error deleting SSH server: {str(e)}")
+        flash(f"Error deleting SSH server: {str(e)}", "danger")
+        return redirect(url_for('ssh_servers'))
+
 @app.route('/ssh/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
@@ -971,10 +1009,17 @@ def edit_project(project_id):
     return render_template('projects/edit.html', project=project)
 
 
-@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+@app.route('/projects/<int:project_id>/delete', methods=['GET', 'POST'])
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
     
+    # If GET request, show confirmation page
+    if request.method == 'GET':
+        # Get associated tasks for display
+        tasks = Task.query.filter_by(project_id=project_id).all()
+        return render_template('projects/delete_project.html', project=project, tasks=tasks)
+    
+    # If POST request, process deletion
     # Delete all tasks associated with the project
     tasks = Task.query.filter_by(project_id=project_id).all()
     for task in tasks:
@@ -1097,18 +1142,33 @@ def edit_task(project_id, task_id):
         
     return render_template('tasks/form.html', project=project, task=task)
 
-@app.route('/projects/<int:project_id>/tasks/<int:task_id>/delete', methods=['POST'])
+@app.route('/projects/<int:project_id>/tasks/<int:task_id>/delete', methods=['GET', 'POST'])
 def delete_task(project_id, task_id):
     task = Task.query.get_or_404(task_id)
+    project = Project.query.get_or_404(project_id)
     
     # Ensure task belongs to the specified project
     if task.project_id != project_id:
         flash('Task does not belong to this project', 'danger')
         return redirect(url_for('project_tasks', project_id=project_id))
-        
+    
+    # If GET request, show confirmation page
+    if request.method == 'GET':
+        # Get associated notes for display
+        notes = TaskNote.query.filter_by(task_id=task.id).all()
+        return render_template('tasks/delete_task.html', project=project, task=task, notes=notes)
+    
+    # If POST request, process deletion
+    # Delete all notes associated with this task first
+    notes = TaskNote.query.filter_by(task_id=task.id).all()
+    for note in notes:
+        db.session.delete(note)
+    
+    # Delete the task
     db.session.delete(task)
     db.session.commit()
     flash('Task deleted successfully', 'success')
+    
     return redirect(url_for('project_tasks', project_id=project_id))
 
 @app.route('/projects/<int:project_id>/tasks/<int:task_id>/status', methods=['POST'])

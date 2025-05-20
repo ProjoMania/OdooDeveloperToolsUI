@@ -61,6 +61,11 @@
                                             title="Connect to Server">
                                         <i class="fas fa-terminal"></i> Connect
                                     </button>
+                                    <a href="{{ url_for('delete_ssh_server', host=server.host) }}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       title="Delete Server">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}

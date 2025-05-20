@@ -113,9 +113,9 @@
                         <i class="fas fa-edit me-1"></i> Edit Task
                     </a>
                     
-                    <button type="button" class="btn btn-outline-danger mb-2" data-bs-toggle="modal" data-bs-target="#deleteTaskModal">
+                    <a href="{{ url_for('delete_task', project_id=project.id, task_id=task.id) }}" class="btn btn-outline-danger mb-2">
                         <i class="fas fa-trash me-1"></i> Delete Task
-                    </button>
+                    </a>
                 </div>
             </div>
             <div class="card-footer text-muted">
@@ -249,24 +249,5 @@
     </div>
 </div>
 
-<!-- Delete Task Modal -->
-<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-labelledby="deleteTaskModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteTaskModalLabel">Confirm Deletion</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-0">Are you sure you want to delete the task <strong>"{{ task.title }}"</strong>? This action cannot be undone.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form method="post" action="{{ url_for('delete_task', project_id=project.id, task_id=task.id) }}">
-                    <button type="submit" class="btn btn-danger">Delete Task</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+
 {% endblock %}
