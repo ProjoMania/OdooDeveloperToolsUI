@@ -37,6 +37,16 @@ A desktop application to simplify Odoo development and server management tasks o
 
 ## Recent Updates
 
+### Application Lifecycle Management (May 2025)
+- Added full application lifecycle management:
+  - Enhanced installation script with system-wide `/opt` installation option
+  - Added systemd service support for automatic startup on boot
+  - New update script that preserves instance data while updating code
+  - New uninstall script for safe and complete application removal
+- Improved deployment flexibility for various use cases:
+  - Desktop usage with manual startup
+  - Server deployment with automatic service management
+
 ### UI Improvements (May 2025)
 - Implemented a modern black and orange color scheme throughout the application
 - Enhanced form controls and improved visual feedback
@@ -144,6 +154,35 @@ To make the application start automatically at system boot, you can set it up as
    ```
 
 > **Note:** The service runs the Flask application in the background. You can access it by opening a web browser and navigating to `http://localhost:5000`
+
+### Updating the Application
+
+To update to the latest version while preserving your data, use the provided update script:
+
+```bash
+./update.sh
+```
+
+The update script will:
+1. Detect whether you're using a standard or system-wide (`/opt`) installation
+2. Create a backup of your current installation
+3. Clone the latest code from the repository
+4. Update all application files while preserving your instance data
+5. Restart the service if it was running
+
+### Uninstalling the Application
+
+If you need to remove the application, use the uninstallation script for a clean removal:
+
+```bash
+./uninstall.sh
+```
+
+The uninstall script will:
+1. Stop and remove the systemd service if it was installed
+2. Offer to back up your instance data (configurations, databases) 
+3. Remove all application files and desktop shortcuts
+4. Provide a clean uninstallation with proper cleanup
 
 ## Usage
 

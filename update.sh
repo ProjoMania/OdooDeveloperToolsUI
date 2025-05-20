@@ -67,7 +67,7 @@ echo -e "${BLUE}Creating backup of current installation...${NC}"
 BACKUP_DIR="$INSTALL_PATH.backup.$(date +%Y%m%d%H%M%S)"
 
 if [ "$IS_OPT_INSTALL" = true ]; then
-    sudo mkdir -p "$BACKUP_DIR"
+    sudo mkdir -p "$INSTALL_PATH"
     sudo rsync -a --exclude="instance" "$INSTALL_PATH/" "$BACKUP_DIR/"
 else
     mkdir -p "$BACKUP_DIR"
@@ -82,7 +82,7 @@ if [ "$IS_OPT_INSTALL" = true ]; then
     # For /opt installation, we need sudo
     sudo rsync -a --exclude=".git" --exclude="instance" "$TEMP_DIR/repo/" "$INSTALL_PATH/"
     # Ensure proper permissions
-    sudo chown -R $(whoami):$(whoami) "$INSTALL_PATH"
+    sudo chown -R "$(whoami):$(whoami)" "$INSTALL_PATH"
     sudo chmod -R 755 "$INSTALL_PATH"
 else
     # For regular installation
@@ -94,7 +94,7 @@ if [ -d "$TEMP_DIR/instance_backup" ]; then
     echo -e "${BLUE}Restoring instance directory...${NC}"
     if [ "$IS_OPT_INSTALL" = true ]; then
         sudo rsync -a "$TEMP_DIR/instance_backup/" "$INSTALL_PATH/instance/"
-        sudo chown -R $(whoami):$(whoami) "$INSTALL_PATH/instance"
+        sudo chown -R "$(whoami):$(whoami)" "$INSTALL_PATH/instance"
     else
         rsync -a "$TEMP_DIR/instance_backup/" "$INSTALL_PATH/instance/"
     fi
@@ -103,6 +103,24 @@ fi
 # Clean up temporary directory
 echo -e "${BLUE}Cleaning up...${NC}"
 rm -rf "$TEMP_DIR"
+
+# If we installed to /opt, update the desktop file
+if [ "$IS_OPT_INSTALL" = true ]; then
+    echo -e "${YELLOW}Updating desktop shortcut for new location...${NC}"
+    mkdir -p "$HOME/.local/share/applications"
+    cat > "$HOME/.local/share/applications/odoo-dev-tools.desktop" << EOF
+[Desktop Entry]
+Name=Odoo Developer Tools
+Comment=Tools for Odoo development and server management
+Exec="$INSTALL_PATH/app.py"
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+EOF
+    chmod +x "$HOME/.local/share/applications/odoo-dev-tools.desktop"
+    echo -e "${GREEN}Desktop shortcut updated.${NC}"
+fi
 
 # Restart service if it was running
 if [ "$SERVICE_RUNNING" = true ]; then
