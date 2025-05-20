@@ -50,9 +50,9 @@
                                 <td>{{ db.version }}</td>
                                 <td>
                                     {% if db.is_enterprise and db.expiration_date %}
-                                    <span class="badge bg-dark">{{ db.expiration_date }}</span>
+                                    <span>{{ db.expiration_date }}</span>
                                     {% else %}
-                                    <span class="text-muted">-</span>
+                                    <span>-</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ db.size }}</td>
