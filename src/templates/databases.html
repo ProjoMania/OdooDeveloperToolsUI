@@ -2,6 +2,11 @@
 
 {% block title %}Database Management - Odoo Developer Tools{% endblock %}
 
+{% block head %}
+<!-- Add Animate.css for animations -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+{% endblock %}
+
 {% block page_title %}Odoo Database Management{% endblock %}
 
 {% block content %}
@@ -74,10 +79,17 @@
                                             <i class="fas fa-key"></i>
                                         </a>
                                         {% endif %}
+                                        <button type="button"
+                                           class="btn btn-sm btn-primary me-1"
+                                           data-bs-toggle="tooltip"
+                                           title="Request Migration Quote for {{ db.name }}"
+                                           onclick="prepareMigrationRequest('{{ db.name }}', '{{ db.version }}', {{ db.is_enterprise|lower }})">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
                                         <a href="{{ url_for('drop_database', db_name=db.name) }}" 
                                            class="btn btn-sm btn-danger"
                                            data-bs-toggle="tooltip"
-                                           title="Drop Database">
+                                           title="Drop {{ db.name }}">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -174,4 +186,652 @@
         </div>
     </div>
 </div>
+
+<!-- Modal for migration quotation -->
+<div class="modal fade" id="migrateModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #212121; color: #fff;">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exchange-alt me-3" style="font-size: 1.25rem; color: #ff6600;"></i>
+                    <h5 class="modal-title mb-0">Request Migration Quotation</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-info border-start border-4 border-info mb-4">
+                    <div class="d-flex">
+                        <div class="me-3">
+                            <i class="fas fa-info-circle fa-lg" style="color: var(--info-color);"></i>
+                        </div>
+                        <div>
+                            The following information will be sent to ProjoMania to prepare your migration quotation.
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="migrationQuoteForm">
+                    <input type="hidden" id="quote_db_name" name="db_name">
+                    
+                    <div class="row">
+                        <!-- Database Information Column -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 hover-effect">
+                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                                    <h6 class="mb-0"><i class="fas fa-database me-2" style="color: #ff6600;"></i>Database Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="quote_db_version" class="form-label required">Database Version</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
+                                            <input type="text" class="form-control" id="quote_db_version" name="db_version" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="quote_is_enterprise" name="is_enterprise">
+                                        <label class="form-check-label" for="quote_is_enterprise">
+                                            <span class="badge badge-enterprise ms-1">Enterprise</span> database
+                                        </label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label d-block">Total Records</label>
+                                        <div class="d-flex align-items-center">
+                                            <div id="recordCountDisplay" class="form-text me-2">Unknown</div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="fetchRecordCount">
+                                                <i class="fas fa-calculator me-1"></i> Calculate
+                                            </button>
+                                        </div>
+                                        <input type="hidden" id="quote_record_count" name="record_count">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Migration Options Column -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 border-0 shadow hover-effect">
+                                <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                                    <h6 class="mb-0"><i class="fas fa-exchange-alt me-2" style="color: #ff6600;"></i>Migration Options</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row mb-3">
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Migration Service Type <span class="text-danger">*</span></label>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_upgrading" value="upgrading" checked>
+                                                    <label class="form-check-label" for="quote_migration_upgrading">
+                                                        <i class="fas fa-arrow-up text-success me-1"></i> DB Upgrading
+                                                        <small class="d-block text-muted">Moving to higher version</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_downgrading" value="downgrading">
+                                                    <label class="form-check-label" for="quote_migration_downgrading">
+                                                        <i class="fas fa-arrow-down text-warning me-1"></i> DB Downgrading
+                                                        <small class="d-block text-muted">Moving to older version</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_merging" value="merging">
+                                                    <label class="form-check-label" for="quote_migration_merging">
+                                                        <i class="fas fa-object-group text-primary me-1"></i> DBs Merging
+                                                        <small class="d-block text-muted">Merge multiple DBs into one</small>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="migration_type" id="quote_migration_splitting" value="splitting">
+                                                    <label class="form-check-label" for="quote_migration_splitting">
+                                                        <i class="fas fa-object-ungroup text-info me-1"></i> DB Splitting
+                                                        <small class="d-block text-muted">Split multi-company DB</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="quote_target_version" class="form-label">Target Version <span class="text-danger">*</span></label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text"><i class="fas fa-code-branch"></i></span>
+                                                    <select class="form-select" id="quote_target_version">
+                                                        <option value="">Loading versions...</option>
+                                                    </select>
+                                                </div>
+                                                <div id="versionLoadingIndicator" class="form-text d-none">
+                                                    <i class="fas fa-spinner fa-spin me-1"></i> Loading available versions...
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="quote_need_hosting">
+                                                <label class="form-check-label" for="quote_need_hosting">
+                                                    <i class="fas fa-server text-primary me-1"></i> Need hosting
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="quote_need_support">
+                                                <label class="form-check-label" for="quote_need_support">
+                                                    <i class="fas fa-headset text-success me-1"></i> Need technical support
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Information Card -->
+                    <div class="card mb-4 border-0 shadow hover-effect">
+                        <div class="card-header bg-gradient" style="background-color: #212121; color: #fff;">
+                            <h6 class="mb-0"><i class="fas fa-user me-2" style="color: #ff6600;"></i>Your Contact Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_name" class="form-label required">Your Name</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                        <input type="text" class="form-control" id="quote_contact_name" name="contact_name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_email" class="form-label required">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email" class="form-control" id="quote_contact_email" name="contact_email" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="quote_contact_phone" class="form-label">Phone Number (optional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                        <input type="tel" class="form-control" id="quote_contact_phone" name="contact_phone">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <div id="quoteResponseMessage" class="alert mt-3 d-none"></div>
+                    
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="submitMigrationQuote" style="background-color: #ff6600; border-color: #ff6600;">
+                        <span id="quoteSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
+                        <i class="fas fa-paper-plane me-1"></i> Request Quotation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Function to prepare and show the migration request modal
+    function prepareMigrationRequest(dbName, dbVersion, isEnterprise) {
+        // Reset form and messages
+        const form = document.getElementById('migrationQuoteForm');
+        form.reset();
+        document.getElementById('quoteResponseMessage').classList.add('d-none');
+        document.getElementById('quoteSpinner').classList.add('d-none');
+        document.getElementById('recordCountDisplay').textContent = 'Click calculate to determine database size';
+        
+        // Populate the hidden fields
+        document.getElementById('quote_db_name').value = dbName;
+        document.getElementById('quote_db_version').value = dbVersion || '';
+        document.getElementById('quote_is_enterprise').checked = isEnterprise || false;
+        
+        // Set appropriate target version options based on current version
+        const currentVersion = parseFloat(dbVersion || '0.0');
+        const targetVersionSelect = document.getElementById('quote_target_version');
+        
+        // Clear previous options except the empty first option
+        targetVersionSelect.innerHTML = '<option value="">Select target version</option>';
+        
+        // Add target versions based on current version
+        const availableVersions = [
+            {value: '19.0', label: 'Odoo 19.0'},
+            {value: '18.0', label: 'Odoo 18.0'},
+            {value: '17.0', label: 'Odoo 17.0'},
+            {value: '16.0', label: 'Odoo 16.0'},
+            {value: '15.0', label: 'Odoo 15.0'},
+            {value: '14.0', label: 'Odoo 14.0'},
+            {value: '13.0', label: 'Odoo 13.0'},
+            {value: '12.0', label: 'Odoo 12.0'},
+            {value: '11.0', label: 'Odoo 11.0'},
+            {value: '10.0', label: 'Odoo 10.0'},
+            {value: '9.0', label: 'Odoo 9.0'},
+            {value: '8.0', label: 'Odoo 8.0'},
+            {value: '7.0', label: 'Odoo 7.0'},
+        ];
+        
+        availableVersions.forEach(version => {
+            // Show all versions regardless of the current version
+            const option = document.createElement('option');
+            option.value = version.value;
+            option.textContent = version.label;
+            targetVersionSelect.appendChild(option);
+        });
+        
+        // Show the modal
+        const migrateModal = new bootstrap.Modal(document.getElementById('migrateModal'));
+        migrateModal.show();
+    }
+    
+    // Function to fetch the record count from the database
+    document.getElementById('fetchRecordCount').addEventListener('click', function() {
+        const dbName = document.getElementById('quote_db_name').value;
+        if (!dbName) return;
+        
+        // Update UI to show loading
+        const button = this;
+        const displayElement = document.getElementById('recordCountDisplay');
+        
+        // Disable button and show loading state
+        button.disabled = true;
+        const originalButtonHtml = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating...';
+        displayElement.textContent = 'Calculating record count...';
+        
+        // Call the API endpoint
+        fetch(`/api/database/${dbName}/record_count`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const formattedCount = new Intl.NumberFormat().format(data.record_count);
+                    displayElement.innerHTML = `<strong class="text-success">${formattedCount}</strong> records found`;
+                    document.getElementById('quote_record_count').value = data.record_count;
+                } else {
+                    displayElement.innerHTML = '<span class="text-warning">Unable to calculate: ' + (data.message || 'Unknown error') + '</span>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching record count:', error);
+                displayElement.innerHTML = '<span class="text-danger">Error calculating record count. Please try again.</span>';
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalButtonHtml;
+            });
+    });
+    
+    // Handle modal open
+    $(document).on('click', '.btn-migrate', function() {
+        // Get the database name from the button
+        const dbName = $(this).data('db-name');
+        $('#quote_db_name').val(dbName);
+        
+        // Reset form
+        document.getElementById('migrationQuoteForm').reset();
+        $('#recordCountDisplay').text('Unknown');
+        
+        // Fetch available Odoo versions
+        fetchOdooVersions();
+    });
+    
+    // Function to fetch all available Odoo versions
+    function fetchOdooVersions() {
+        const versionSelect = document.getElementById('quote_target_version');
+        const loadingIndicator = document.getElementById('versionLoadingIndicator');
+        
+        // Show loading indicator
+        loadingIndicator.classList.remove('d-none');
+        versionSelect.disabled = true;
+        
+        // Call the API to get all numeric versions
+        fetch('/api/odoo/versions')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.versions && data.versions.length > 0) {
+                    // Clear existing options
+                    versionSelect.innerHTML = '<option value="">Select target version</option>';
+                    
+                    // Add all versions as options (for both upgrading and downgrading)
+                    data.versions.forEach(version => {
+                        const option = document.createElement('option');
+                        option.value = version;
+                        option.textContent = 'Odoo ' + version;
+                        versionSelect.appendChild(option);
+                    });
+                } else {
+                    // If API call fails, add comprehensive list of versions as fallback
+                    versionSelect.innerHTML = `
+                        <option value="">Select target version</option>
+                        <option value="18.0">Odoo 18.0</option>
+                        <option value="17.0">Odoo 17.0</option>
+                        <option value="16.0">Odoo 16.0</option>
+                        <option value="15.0">Odoo 15.0</option>
+                        <option value="14.0">Odoo 14.0</option>
+                        <option value="13.0">Odoo 13.0</option>
+                        <option value="12.0">Odoo 12.0</option>
+                        <option value="11.0">Odoo 11.0</option>
+                        <option value="10.0">Odoo 10.0</option>
+                        <option value="9.0">Odoo 9.0</option>
+                        <option value="8.0">Odoo 8.0</option>
+                        <option value="7.0">Odoo 7.0</option>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching Odoo versions:', error);
+                // Add comprehensive list of versions on error
+                versionSelect.innerHTML = `
+                    <option value="">Select target version</option>
+                    <option value="18.0">Odoo 18.0</option>
+                    <option value="17.0">Odoo 17.0</option>
+                    <option value="16.0">Odoo 16.0</option>
+                    <option value="15.0">Odoo 15.0</option>
+                    <option value="14.0">Odoo 14.0</option>
+                    <option value="13.0">Odoo 13.0</option>
+                    <option value="12.0">Odoo 12.0</option>
+                    <option value="11.0">Odoo 11.0</option>
+                    <option value="10.0">Odoo 10.0</option>
+                    <option value="9.0">Odoo 9.0</option>
+                    <option value="8.0">Odoo 8.0</option>
+                    <option value="7.0">Odoo 7.0</option>
+                `;
+            })
+            .finally(() => {
+                // Hide loading indicator and enable select
+                loadingIndicator.classList.add('d-none');
+                versionSelect.disabled = false;
+            });
+    }
+    
+    // Handle migration quotation form submission
+    document.getElementById('submitMigrationQuote').addEventListener('click', function() {
+        // Get form and validate
+        const form = document.getElementById('migrationQuoteForm');
+        const submitButton = this;
+        const contactName = document.getElementById('quote_contact_name').value.trim();
+        const contactEmail = document.getElementById('quote_contact_email').value.trim();
+        const targetVersion = document.getElementById('quote_target_version').value;
+        const dbVersion = document.getElementById('quote_db_version').value.trim();
+        
+        // Reset any previous validation styles
+        resetValidationStyles();
+        
+        // Enhanced validation with visual feedback
+        let isValid = true;
+        
+        // Required fields validation
+        if (!contactName) {
+            markFieldInvalid('quote_contact_name', 'Name is required');
+            isValid = false;
+        }
+        
+        if (!contactEmail) {
+            markFieldInvalid('quote_contact_email', 'Email is required');
+            isValid = false;
+        } else {
+            // Email format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(contactEmail)) {
+                markFieldInvalid('quote_contact_email', 'Please enter a valid email address');
+                isValid = false;
+            }
+        }
+        
+        if (!targetVersion) {
+            markFieldInvalid('quote_target_version', 'Target version is required');
+            isValid = false;
+        }
+        
+        if (!dbVersion) {
+            markFieldInvalid('quote_db_version', 'Database version is required');
+            isValid = false;
+        }
+        
+        // If validation fails, show error and stop
+        if (!isValid) {
+            showResponseMessage('Please correct the errors in the form.', 'danger');
+            return;
+        }
+        
+        // Show loading state
+        submitButton.disabled = true;
+        const spinner = document.getElementById('quoteSpinner');
+        spinner.classList.remove('d-none');
+        
+        // Get selected migration service type
+        const migrationTypeElements = document.getElementsByName('migration_type');
+        let selectedMigrationType = 'upgrading'; // Default
+        for (const element of migrationTypeElements) {
+            if (element.checked) {
+                selectedMigrationType = element.value;
+                break;
+            }
+        }
+        
+        // Prepare request data with migration service type
+        const requestData = {
+            database_info: {
+                name: document.getElementById('quote_db_name').value,
+                current_version: dbVersion,
+                is_enterprise: document.getElementById('quote_is_enterprise').checked,
+                record_count: document.getElementById('quote_record_count').value || 0
+            },
+            migration_options: {
+                service_type: selectedMigrationType,
+                target_version: targetVersion,
+                need_hosting: document.getElementById('quote_need_hosting').checked,
+                need_support: document.getElementById('quote_need_support')?.checked || false
+            },
+            contact_info: {
+                name: contactName,
+                email: contactEmail,
+                phone: document.getElementById('quote_contact_phone').value.trim()
+            }
+        };
+        
+        // Submit the data to the API with animated feedback
+        fetch('/api/migration/request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Create success message with reference ID
+                const successMessage = `
+                    <div class="text-center mb-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
+                    </div>
+                    <h5 class="text-center mb-3">Quotation Request Submitted!</h5>
+                    <p>Your migration quotation request has been successfully submitted to ProjoMania.</p>
+                    <div class="alert alert-light border">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-tag me-2 text-primary"></i>
+                            <strong>Reference ID:</strong> 
+                            <span class="ms-2 badge bg-dark">${data.reference_id}</span>
+                        </div>
+                    </div>
+                    <p class="mt-3 mb-0">A migration specialist will contact you soon with pricing and timeline details.</p>
+                `;
+                
+                // Show nicely formatted success message
+                const responseElement = document.getElementById('quoteResponseMessage');
+                responseElement.className = 'alert alert-success mt-4';
+                responseElement.innerHTML = successMessage;
+                responseElement.classList.remove('d-none');
+                
+                // Scroll to message
+                responseElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Disable form fields to prevent resubmission
+                disableFormFields();
+                
+                // Change button to a success state
+                submitButton.innerHTML = '<i class="fas fa-check me-1"></i> Request Sent';
+                submitButton.classList.remove('btn-primary');
+                submitButton.classList.add('btn-success');
+                
+                // Auto close after delay
+                setTimeout(() => {
+                    const migrateModal = bootstrap.Modal.getInstance(document.getElementById('migrateModal'));
+                    migrateModal.hide();
+                    showToast('Migration quotation request submitted successfully!', 'success');
+                    
+                    // Reset button state after modal is hidden
+                    setTimeout(() => {
+                        submitButton.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Request Quotation';
+                        submitButton.classList.remove('btn-success');
+                        submitButton.classList.add('btn-primary');
+                        submitButton.disabled = false;
+                        spinner.classList.add('d-none');
+                        resetFormFields();
+                    }, 500);
+                }, 4000);
+            } else {
+                // Show error message
+                showResponseMessage(`<i class="fas fa-exclamation-triangle me-2"></i> Error submitting request: ${data.message || 'Unknown error'}`, 'danger');
+                submitButton.disabled = false;
+                spinner.classList.add('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Error submitting migration request:', error);
+            showResponseMessage(`<i class="fas fa-exclamation-circle me-2"></i> Network error: Failed to submit migration request. Please try again later.`, 'danger');
+            submitButton.disabled = false;
+            spinner.classList.add('d-none');
+        });
+    });
+    
+    // Form validation helper functions
+    function markFieldInvalid(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        field.classList.add('is-invalid');
+        
+        // Add validation message if it doesn't exist
+        let feedbackElement = field.nextElementSibling;
+        if (!feedbackElement || !feedbackElement.classList.contains('invalid-feedback')) {
+            feedbackElement = document.createElement('div');
+            feedbackElement.className = 'invalid-feedback';
+            field.parentNode.insertBefore(feedbackElement, field.nextSibling);
+        }
+        feedbackElement.textContent = message;
+    }
+    
+    function resetValidationStyles() {
+        // Clear all validation styles
+        const invalidFields = document.querySelectorAll('.is-invalid');
+        invalidFields.forEach(field => field.classList.remove('is-invalid'));
+        
+        // Hide any existing validation messages
+        document.getElementById('quoteResponseMessage').classList.add('d-none');
+    }
+    
+    function disableFormFields() {
+        // Disable all form fields to prevent changes after submission
+        const form = document.getElementById('migrationQuoteForm');
+        const fields = form.querySelectorAll('input, select, textarea, button');
+        fields.forEach(field => field.disabled = true);
+    }
+    
+    function resetFormFields() {
+        // Reset and enable all form fields
+        const form = document.getElementById('migrationQuoteForm');
+        form.reset();
+        const fields = form.querySelectorAll('input, select, textarea, button');
+        fields.forEach(field => field.disabled = false);
+        resetValidationStyles();
+    }
+    
+    // Helper function to show response messages in the modal
+    function showResponseMessage(message, type) {
+        const messageElement = document.getElementById('quoteResponseMessage');
+        messageElement.textContent = message;
+        messageElement.className = 'alert mt-3';
+        messageElement.classList.add(`alert-${type}`);
+        messageElement.classList.remove('d-none');
+    }
+    
+    // Helper function to show toast notifications with different types (success, danger, warning, info)
+    function showToast(message, type = 'info') {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+            toastContainer.style.zIndex = '9999';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Map type to icon and color
+        const typeConfig = {
+            success: { icon: 'fa-check-circle', color: 'var(--success-color)' },
+            danger: { icon: 'fa-exclamation-circle', color: 'var(--danger-color)' },
+            warning: { icon: 'fa-exclamation-triangle', color: 'var(--warning-color)' },
+            info: { icon: 'fa-info-circle', color: 'var(--info-color)' },
+            primary: { icon: 'fa-bell', color: 'var(--primary-color)' }
+        };
+        
+        const config = typeConfig[type] || typeConfig.info;
+        
+        // Create toast element
+        const toastId = 'toast-' + Date.now();
+        const toast = document.createElement('div');
+        toast.className = 'toast show';
+        toast.id = toastId;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.style.borderLeft = `4px solid ${config.color}`;
+        toast.style.boxShadow = 'var(--shadow-lg)';
+        
+        // Define header text based on type
+        let headerText = 'Notification';
+        if (type === 'success') headerText = 'Success';
+        if (type === 'danger') headerText = 'Error';
+        if (type === 'warning') headerText = 'Warning';
+        if (type === 'info') headerText = 'Information';
+        
+        toast.innerHTML = `
+            <div class="toast-header">
+                <i class="fas ${config.icon} me-2" style="color: ${config.color}"></i>
+                <strong class="me-auto">${headerText}</strong>
+                <small>just now</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+        
+        // Add animation class
+        toast.classList.add('animate__animated', 'animate__fadeInUp');
+        
+        // Add to container (at the beginning so newest is on top)
+        toastContainer.prepend(toast);
+        
+        // Auto dismiss after 5 seconds
+        setTimeout(() => {
+            toast.classList.replace('animate__fadeInUp', 'animate__fadeOutRight');
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+        
+        // Add click to dismiss
+        toast.addEventListener('click', function() {
+            toast.classList.replace('animate__fadeInUp', 'animate__fadeOutRight');
+            setTimeout(() => toast.remove(), 500);
+        });
+    }
+</script>
+{% endblock %}
+
+
 {% endblock %}
