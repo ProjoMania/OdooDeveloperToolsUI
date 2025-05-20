@@ -17,9 +17,9 @@
             <div class="card-body">
                 <form id="restore-database-form" method="post" action="{{ url_for('restore_database') }}" enctype="multipart/form-data">
                     <div class="mb-4">
-                        <label for="backup_file" class="form-label required">Backup File (.zip)</label>
-                        <input type="file" class="form-control" id="backup_file" name="backup_file" required accept=".zip">
-                        <div class="form-text">Select a valid Odoo backup file (ZIP format containing dump.sql and optionally filestore.zip)</div>
+                        <label for="backup_file" class="form-label required">Backup File (.zip or .dump)</label>
+                        <input type="file" class="form-control" id="backup_file" name="backup_file" required accept=".zip,.dump">
+                        <div class="form-text">Select either a direct .dump file or a ZIP archive containing dump.sql or *.dump and optionally filestore.zip</div>
                     </div>
                     
                     <div class="mb-4">
@@ -90,12 +90,16 @@
             <div class="card-body">
                 <div class="mb-3">
                     <h6><i class="fas fa-info-circle me-2"></i> Backup File Format</h6>
-                    <p>The backup file should be a ZIP archive containing:</p>
-                    <ul>
-                        <li><code>dump.sql</code> - PostgreSQL SQL dump file</li>
+                    <p>The system supports two types of backups:</p>
+                    <ol>
+                        <li><strong>Direct .dump file</strong> - A PostgreSQL dump file (with .dump extension)</li>
+                        <li><strong>ZIP archive</strong> containing:</li>
+                    </ol>
+                    <ul style="margin-left: 20px;">
+                        <li><code>dump.sql</code> or <code>*.dump</code> - PostgreSQL SQL dump file</li>
                         <li><code>filestore.zip</code> (optional) - ZIP archive of the Odoo filestore</li>
                     </ul>
-                    <p>This is the standard format produced by Odoo's backup functionality.</p>
+                    <p>The ZIP format is the standard produced by Odoo's backup functionality.</p>
                 </div>
                 
                 <div class="mb-3">

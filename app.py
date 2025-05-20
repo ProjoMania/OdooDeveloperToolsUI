@@ -10,6 +10,7 @@ import re
 import zipfile
 import tempfile
 import shutil
+import glob
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
@@ -410,6 +411,8 @@ def restore_database():
             return redirect(request.url)
             
         if file:
+            # Check if the file is a .dump file
+            is_dump_file = file.filename.lower().endswith('.dump')
             # Get form data
             db_name = request.form.get('db_name', '').strip()
             
@@ -433,17 +436,39 @@ def restore_database():
                 # Create temp directory for extraction
                 temp_dir = tempfile.mkdtemp()
                 
-                # Extract the backup zip
-                with zipfile.ZipFile(filepath, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
-                
-                # Look for the SQL dump file
-                dump_file = os.path.join(temp_dir, "dump.sql")
-                if not os.path.exists(dump_file):
-                    flash('Invalid backup: dump.sql not found in the backup file', 'danger')
-                    shutil.rmtree(temp_dir)
-                    os.remove(filepath)
-                    return redirect(request.url)
+                # Handle direct .dump files or ZIP archives differently
+                if is_dump_file:
+                    # Use the uploaded .dump file directly
+                    dump_file = filepath
+                    dump_found = True
+                    has_filestore = False  # Direct .dump files don't have filestore
+                else:
+                    # Extract the backup zip
+                    try:
+                        with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                            zip_ref.extractall(temp_dir)
+                    except zipfile.BadZipFile:
+                        flash('The uploaded file is not a valid ZIP archive. Please upload a proper ZIP file containing SQL dump or a direct .dump file.', 'danger')
+                        shutil.rmtree(temp_dir)
+                        os.remove(filepath)
+                        return redirect(request.url)
+                    
+                    # Look for the SQL dump file (both dump.sql and *.dump formats)
+                    dump_file = os.path.join(temp_dir, "dump.sql")
+                    dump_found = os.path.exists(dump_file)
+                    
+                    # If dump.sql not found, look for *.dump files
+                    if not dump_found:
+                        dump_files = glob.glob(os.path.join(temp_dir, "*.dump"))
+                        if dump_files:
+                            dump_file = dump_files[0]  # Use the first dump file found
+                            dump_found = True
+                    
+                    if not dump_found:
+                        flash('Invalid backup: No SQL dump file (dump.sql or *.dump) found in the backup file', 'danger')
+                        shutil.rmtree(temp_dir)
+                        os.remove(filepath)
+                        return redirect(request.url)
                 
                 # Check for filestore directory or filestore.zip (for backward compatibility)
                 filestore_dir = os.path.join(temp_dir, "filestore")
