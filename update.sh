@@ -48,10 +48,25 @@ fi
 
 # Check if service is running and stop it if necessary
 SERVICE_RUNNING=false
-if [ "$IS_OPT_INSTALL" = true ] && systemctl is-active --quiet odoo-developer-tools.service; then
-    echo -e "${YELLOW}Stopping the service for update...${NC}"
-    sudo systemctl stop odoo-developer-tools.service
-    SERVICE_RUNNING=true
+SERVICE_EXISTS=false
+
+if [ "$IS_OPT_INSTALL" = true ]; then
+    # Check if service file exists
+    if sudo systemctl list-unit-files | grep -q odoo-developer-tools.service; then
+        SERVICE_EXISTS=true
+        echo -e "${BLUE}Service exists and will be managed during update.${NC}"
+        
+        # Check if service is running
+        if systemctl is-active --quiet odoo-developer-tools.service; then
+            echo -e "${YELLOW}Stopping the service for update...${NC}"
+            sudo systemctl stop odoo-developer-tools.service
+            SERVICE_RUNNING=true
+        else
+            echo -e "${YELLOW}Service exists but is not running.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Service does not exist. It will be set up during update.${NC}"
+    fi
 fi
 
 # Check if instance directory exists and back it up
@@ -134,16 +149,35 @@ EOF
     echo -e "${GREEN}Desktop shortcut updated.${NC}"
 fi
 
-# Restart service if it was running
-if [ "$SERVICE_RUNNING" = true ]; then
-    echo -e "${YELLOW}Restarting the service...${NC}"
-    sudo systemctl start odoo-developer-tools.service
-    
-    # Check if service started successfully
-    if sudo systemctl is-active --quiet odoo-developer-tools.service; then
-        echo -e "${GREEN}Service has been restarted successfully.${NC}"
+# Handle service setup and restart
+if [ "$IS_OPT_INSTALL" = true ]; then
+    # Check if systemd service file exists in the updated code
+    if [ -f "$INSTALL_PATH/systemd/odoo-developer-tools.service" ]; then
+        echo -e "${YELLOW}Found service definition file, ensuring service is properly configured...${NC}"
+        
+        # Copy service file to systemd directory
+        sudo cp "$INSTALL_PATH/systemd/odoo-developer-tools.service" /etc/systemd/system/
+        sudo systemctl daemon-reload
+        
+        # Enable service if not already enabled
+        if ! sudo systemctl is-enabled --quiet odoo-developer-tools.service; then
+            echo -e "${BLUE}Enabling service to start on boot...${NC}"
+            sudo systemctl enable odoo-developer-tools.service
+        fi
+        
+        # Always start the service after update
+        echo -e "${YELLOW}Starting the service...${NC}"
+        sudo systemctl start odoo-developer-tools.service
+        
+        # Check if service started successfully
+        if sudo systemctl is-active --quiet odoo-developer-tools.service; then
+            echo -e "${GREEN}Service has been started successfully.${NC}"
+        else
+            echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
+        fi
     else
-        echo -e "${RED}Failed to restart the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
+        echo -e "${RED}Service definition file not found. Cannot configure systemd service.${NC}"
+        echo -e "${YELLOW}You may need to run the install.sh script to properly set up the service.${NC}"
     fi
 fi
 
@@ -151,11 +185,21 @@ echo
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}     Update Complete!               ${NC}"
 echo -e "${GREEN}=====================================${NC}"
+echo -e "${YELLOW}Actions performed:${NC}"
+echo -e " ✅ ${BLUE}Latest code pulled from repository${NC}"
+echo -e " ✅ ${BLUE}Files updated in $INSTALL_PATH${NC}"
 
-if [ "$SERVICE_RUNNING" = true ]; then
-    echo -e "The application is running at: ${BLUE}http://localhost:5000${NC}"
+if [ "$IS_OPT_INSTALL" = true ]; then
+    if sudo systemctl is-active --quiet odoo-developer-tools.service; then
+        echo -e " ✅ ${BLUE}Service restarted and running${NC}"
+        echo -e "\nThe application is running at: ${BLUE}http://localhost:5000${NC}"
+    else
+        echo -e " ❌ ${RED}Service is not running${NC}"
+        echo -e "\nYou can try manually starting the service with: ${YELLOW}sudo systemctl start odoo-developer-tools.service${NC}"
+    fi
 else
-    echo -e "You can now start the application with: ${BLUE}python3 app.py${NC}"
+    echo -e " ℹ️ ${BLUE}No service management needed for local installation${NC}"
+    echo -e "\nYou can now start the application with: ${BLUE}python3 app.py${NC}"
 fi
 
 echo
