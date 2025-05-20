@@ -192,7 +192,9 @@ def add_ssh_server():
         hostname = request.form.get('hostname').strip()
         user = request.form.get('user').strip()
         port = request.form.get('port').strip() or "22"
-        key_file = request.form.get('key_file').strip()
+        auth_method = request.form.get('auth_method', 'key')
+        key_file = request.form.get('key_file', '').strip() if auth_method == 'key' else ''
+        password = request.form.get('password', '').strip() if auth_method == 'password' else ''
         
         # Validate inputs
         if not host or not hostname:
@@ -212,11 +214,14 @@ def add_ssh_server():
                     'hostname': hostname,
                     'user': user,
                     'port': port,
-                    'key_file': key_file
+                    'auth_method': auth_method,
+                    'key_file': key_file,
+                    'password': password
                 }
                 return render_template('ssh_add.html', overwrite=True, 
                                       host=host, hostname=hostname, 
-                                      user=user, port=port, key_file=key_file)
+                                      user=user, port=port, auth_method=auth_method,
+                                      key_file=key_file, password=password)
         
         # Write the configuration file
         with open(config_file, 'w') as f:
@@ -225,8 +230,17 @@ def add_ssh_server():
             if user:
                 f.write(f"    User {user}\n")
             f.write(f"    Port {port}\n")
-            if key_file:
+            
+            # Authentication settings
+            if auth_method == 'key' and key_file:
                 f.write(f"    IdentityFile {key_file}\n")
+                f.write(f"    PreferredAuthentications publickey\n")
+            elif auth_method == 'password' and password:
+                f.write(f"    PreferredAuthentications password\n")
+                f.write(f"    PasswordAuthentication yes\n")
+                # Store password in a safer way in a real-world application
+                # For this demo, we'll add it as a comment (NOT recommended for production)
+                f.write(f"    # Password: {password}\n")
         
         # Update main SSH config if needed
         update_main_ssh_config()
@@ -250,26 +264,50 @@ def add_ssh_server():
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
     servers = get_ssh_servers()
-    server = next((s for s in servers if s['host'] == host), None)
     
-    if not server:
-        return jsonify({'error': 'Server not found'}), 404
+    # Find the server with matching host
+    for server in servers:
+        if server.get('host') == host:
+            # Build ssh command with appropriate flags
+            command = f"ssh {server.get('host')}"
+            
+            # Add authentication info to command response
+            auth_type = 'key' if server.get('identity_file') else 'password'
+            response = {
+                'command': command,
+                'auth_type': auth_type,
+                'host': server.get('host'),
+                'user': server.get('user', ''),
+                'hostname': server.get('hostname', '')
+            }
+            
+            return jsonify(response)
     
-    # Create the SSH command
-    command = f"ssh {server['host']}"
-    
-    return jsonify({'command': command})
+    return jsonify({'error': 'Server not found'})
 
 @app.route('/ssh/connect', methods=['POST'])
 def ssh_connect():
-    """Handle SSH connection request"""
+    # Handle SSH connection request
     if request.method == 'POST':
         command = request.form.get('command')
+        server_host = request.form.get('server_host', '')
+        auth_type = request.form.get('auth_type', 'key')
+        user = request.form.get('user', '')
+        hostname = request.form.get('hostname', '')
+        
         if command:
             try:
+                # Prepare server information for the template
+                server_info = {
+                    'host': server_host,
+                    'auth_type': auth_type,
+                    'user': user,
+                    'hostname': hostname
+                }
+                
                 # Redirect to a terminal command using the SSH command
                 # This could be customized based on your environment and terminal preferences
-                return render_template('ssh_connect.html', command=command)
+                return render_template('ssh_connect.html', command=command, server_info=server_info)
             except Exception as e:
                 flash(f'Error connecting to SSH: {str(e)}', 'error')
                 return redirect(url_for('ssh_servers'))

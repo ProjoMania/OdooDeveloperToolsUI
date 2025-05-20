@@ -55,7 +55,19 @@
                         <div class="form-text">SSH port (default is 22)</div>
                     </div>
                     
-                    <div class="mb-3">
+                    <div class="mb-4">
+                        <h6 class="mb-3">Authentication Method</h6>
+                        <div class="form-check form-check-inline mb-2">
+                            <input class="form-check-input" type="radio" name="auth_method" id="auth-key" value="key" checked>
+                            <label class="form-check-label" for="auth-key">SSH Key</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="auth_method" id="auth-password" value="password">
+                            <label class="form-check-label" for="auth-password">Password</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="key-file-section">
                         <label for="key_file" class="form-label">SSH Key File</label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="key_file" name="key_file" 
@@ -65,7 +77,14 @@
                                 Browse
                             </button>
                         </div>
-                        <div class="form-text">Path to your SSH key file (optional)</div>
+                        <div class="form-text">Path to your SSH key file</div>
+                    </div>
+                    
+                    <div class="mb-3" id="password-section" style="display: none;">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               placeholder="SSH Password">
+                        <div class="form-text">Password for SSH authentication (will be stored in config)</div>
                     </div>
                     
                     <div class="d-grid gap-2 mt-4">
@@ -110,6 +129,30 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Handle authentication method selection
+        const authKeyRadio = document.getElementById('auth-key');
+        const authPasswordRadio = document.getElementById('auth-password');
+        const keyFileSection = document.getElementById('key-file-section');
+        const passwordSection = document.getElementById('password-section');
+        
+        // Function to toggle auth sections visibility
+        function toggleAuthSections() {
+            if (authKeyRadio.checked) {
+                keyFileSection.style.display = 'block';
+                passwordSection.style.display = 'none';
+            } else {
+                keyFileSection.style.display = 'none';
+                passwordSection.style.display = 'block';
+            }
+        }
+        
+        // Set initial state
+        toggleAuthSections();
+        
+        // Add event listeners
+        authKeyRadio.addEventListener('change', toggleAuthSections);
+        authPasswordRadio.addEventListener('change', toggleAuthSections);
+        
         // Handle browsing for SSH key file (in a real desktop app this would open a file dialog)
         // For the web app, we show a modal with common SSH key locations
         const browseButton = document.getElementById('browse-key');

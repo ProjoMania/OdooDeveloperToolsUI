@@ -20,8 +20,47 @@
                         </div>
                         <div>
                             <h6 class="alert-heading mb-1 fw-bold">Connection Information</h6>
-                            <p class="mb-0">The system is attempting to connect to the SSH server with the following command:</p>
-                            <code class="mt-2 d-block p-2 bg-light">{{ command }}</code>
+                            <p class="mb-0">The system is attempting to connect to the SSH server:</p>
+                            <div class="mt-2 p-3 bg-light rounded">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <strong><i class="fas fa-server me-2" style="color: var(--primary-color);"></i>Server:</strong>
+                                    </div>
+                                    <div class="col-md-8">
+                                        {{ server_info.hostname|default(command) }}
+                                    </div>
+                                </div>
+                                {% if server_info.user %}
+                                <div class="row mt-2">
+                                    <div class="col-md-4">
+                                        <strong><i class="fas fa-user me-2" style="color: var(--primary-color);"></i>User:</strong>
+                                    </div>
+                                    <div class="col-md-8">
+                                        {{ server_info.user }}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="row mt-2">
+                                    <div class="col-md-4">
+                                        <strong><i class="fas fa-key me-2" style="color: var(--primary-color);"></i>Auth Method:</strong>
+                                    </div>
+                                    <div class="col-md-8">
+                                        {% if server_info.auth_type == 'key' %}
+                                            <span class="badge bg-success">SSH Key</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">Password</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-4">
+                                        <strong><i class="fas fa-terminal me-2" style="color: var(--primary-color);"></i>Command:</strong>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <code>{{ command }}</code>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
