@@ -72,6 +72,34 @@ setup_systemd_service() {
     # Get current username
     CURRENT_USER=$(whoami)
     
+    # Determine install location
+    echo -e "${BLUE}Choose installation location:${NC}"
+    echo -e "1. System-wide installation in /opt (recommended for services) - requires sudo"
+    echo -e "2. Keep in current location: $SCRIPT_DIR"
+    read -p "Enter your choice [1]: " INSTALL_LOCATION_CHOICE
+    
+    # Default to /opt if no selection is made
+    INSTALL_LOCATION_CHOICE=${INSTALL_LOCATION_CHOICE:-1}
+    
+    # Set the installation directory based on user choice
+    if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
+        INSTALL_DIR="/opt/odoo-developer-tools"
+        echo -e "${YELLOW}Installing to $INSTALL_DIR...${NC}"
+        
+        # Create the directory and copy files
+        sudo mkdir -p "$INSTALL_DIR"
+        sudo cp -r "$SCRIPT_DIR"/* "$INSTALL_DIR"/
+        sudo chown -R "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR"
+        sudo chmod -R 755 "$INSTALL_DIR"
+        echo -e "${GREEN}Files copied to $INSTALL_DIR${NC}"
+        
+        # Update application path
+        APP_DIR="$INSTALL_DIR"
+    else
+        APP_DIR="$SCRIPT_DIR"
+        echo -e "${YELLOW}Using current location: $APP_DIR${NC}"
+    fi
+    
     # Create service file
     echo -e "${YELLOW}Creating service file...${NC}"
     
@@ -82,8 +110,8 @@ setup_systemd_service() {
     SERVICE_CONTENT+="[Service]\n"
     SERVICE_CONTENT+="Type=simple\n"
     SERVICE_CONTENT+="User=$CURRENT_USER\n"
-    SERVICE_CONTENT+="WorkingDirectory=$SCRIPT_DIR\n"
-    SERVICE_CONTENT+="ExecStart=/usr/bin/python3 $SCRIPT_DIR/app.py\n"
+    SERVICE_CONTENT+="WorkingDirectory=$APP_DIR\n"
+    SERVICE_CONTENT+="ExecStart=/usr/bin/python3 $APP_DIR/app.py\n"
     SERVICE_CONTENT+="Restart=on-failure\n"
     SERVICE_CONTENT+="RestartSec=5\n"
     SERVICE_CONTENT+="StandardOutput=syslog\n"
@@ -100,6 +128,24 @@ setup_systemd_service() {
         return 1
     fi
     
+    # If we installed to /opt, update the desktop file
+    if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
+        echo -e "${YELLOW}Updating desktop shortcut for new location...${NC}"
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/odoo-dev-tools.desktop << EOF
+[Desktop Entry]
+Name=Odoo Developer Tools
+Comment=Tools for Odoo development and server management
+Exec=$APP_DIR/app.py
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+EOF
+        chmod +x ~/.local/share/applications/odoo-dev-tools.desktop
+        echo -e "${GREEN}Desktop shortcut updated.${NC}"
+    fi
+    
     # Reload systemd, enable and start the service
     echo -e "${YELLOW}Enabling and starting the service...${NC}"
     sudo systemctl daemon-reload
@@ -110,6 +156,11 @@ setup_systemd_service() {
     if sudo systemctl is-active --quiet odoo-developer-tools.service; then
         echo -e "${GREEN}Service has been started successfully.${NC}"
         echo -e "${GREEN}The application will now start automatically on system boot.${NC}"
+        
+        if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
+            echo -e "${GREEN}Application has been installed to: $APP_DIR${NC}"
+        fi
+        
         echo -e "${YELLOW}Access the application at: http://localhost:5000${NC}"
         return 0
     else
