@@ -65,110 +65,6 @@ detect_distro() {
     echo $DISTRO
 }
 
-# Function to create and setup systemd service
-setup_systemd_service() {
-    echo -e "${BLUE}Setting up systemd service for auto-start on boot...${NC}"
-    
-    # Get current username
-    CURRENT_USER=$(whoami)
-    
-    # Determine install location
-    echo -e "${BLUE}Choose installation location:${NC}"
-    echo -e "1. System-wide installation in /opt (recommended for services) - requires sudo"
-    echo -e "2. Keep in current location: $SCRIPT_DIR"
-    read -p "Enter your choice [1]: " INSTALL_LOCATION_CHOICE
-    
-    # Default to /opt if no selection is made
-    INSTALL_LOCATION_CHOICE=${INSTALL_LOCATION_CHOICE:-1}
-    
-    # Set the installation directory based on user choice
-    if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
-        INSTALL_DIR="/opt/odoo-developer-tools"
-        echo -e "${YELLOW}Installing to $INSTALL_DIR...${NC}"
-        
-        # Create the directory and copy files
-        sudo mkdir -p "$INSTALL_DIR"
-        sudo cp -r "$SCRIPT_DIR"/* "$INSTALL_DIR"/
-        sudo chown -R "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR"
-        sudo chmod -R 755 "$INSTALL_DIR"
-        echo -e "${GREEN}Files copied to $INSTALL_DIR${NC}"
-        
-        # Update application path
-        APP_DIR="$INSTALL_DIR"
-    else
-        APP_DIR="$SCRIPT_DIR"
-        echo -e "${YELLOW}Using current location: $APP_DIR${NC}"
-    fi
-    
-    # Create service file
-    echo -e "${YELLOW}Creating service file...${NC}"
-    
-    # Service file content
-    SERVICE_CONTENT="[Unit]\n"
-    SERVICE_CONTENT+="Description=Odoo Developer Tools UI\n"
-    SERVICE_CONTENT+="After=network.target postgresql.service\n\n"
-    SERVICE_CONTENT+="[Service]\n"
-    SERVICE_CONTENT+="Type=simple\n"
-    SERVICE_CONTENT+="User=$CURRENT_USER\n"
-    SERVICE_CONTENT+="WorkingDirectory=$APP_DIR\n"
-    SERVICE_CONTENT+="ExecStart=/usr/bin/python3 $APP_DIR/app.py\n"
-    SERVICE_CONTENT+="Restart=on-failure\n"
-    SERVICE_CONTENT+="RestartSec=5\n"
-    SERVICE_CONTENT+="StandardOutput=syslog\n"
-    SERVICE_CONTENT+="StandardError=syslog\n"
-    SERVICE_CONTENT+="SyslogIdentifier=odoo-dev-tools\n\n"
-    SERVICE_CONTENT+="[Install]\n"
-    SERVICE_CONTENT+="WantedBy=multi-user.target\n"
-    
-    # Use sudo to write the service file
-    echo -e "$SERVICE_CONTENT" | sudo tee /etc/systemd/system/odoo-developer-tools.service > /dev/null
-    
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to create service file. Make sure you have sudo privileges.${NC}"
-        return 1
-    fi
-    
-    # If we installed to /opt, update the desktop file
-    if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
-        echo -e "${YELLOW}Updating desktop shortcut for new location...${NC}"
-        mkdir -p ~/.local/share/applications
-        cat > ~/.local/share/applications/odoo-dev-tools.desktop << EOF
-[Desktop Entry]
-Name=Odoo Developer Tools
-Comment=Tools for Odoo development and server management
-Exec=$APP_DIR/app.py
-Icon=utilities-terminal
-Terminal=false
-Type=Application
-Categories=Development;Utility;
-EOF
-        chmod +x ~/.local/share/applications/odoo-dev-tools.desktop
-        echo -e "${GREEN}Desktop shortcut updated.${NC}"
-    fi
-    
-    # Reload systemd, enable and start the service
-    echo -e "${YELLOW}Enabling and starting the service...${NC}"
-    sudo systemctl daemon-reload
-    sudo systemctl enable odoo-developer-tools.service
-    sudo systemctl start odoo-developer-tools.service
-    
-    # Check if service started successfully
-    if sudo systemctl is-active --quiet odoo-developer-tools.service; then
-        echo -e "${GREEN}Service has been started successfully.${NC}"
-        echo -e "${GREEN}The application will now start automatically on system boot.${NC}"
-        
-        if [ "$INSTALL_LOCATION_CHOICE" = "1" ]; then
-            echo -e "${GREEN}Application has been installed to: $APP_DIR${NC}"
-        fi
-        
-        echo -e "${YELLOW}Access the application at: http://localhost:5000${NC}"
-        return 0
-    else
-        echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
-        return 1
-    fi
-}
-
 # Install dependencies based on distribution
 install_dependencies() {
     local distro=$(detect_distro)
@@ -277,39 +173,14 @@ else
     echo -e "${GREEN}SSH config already includes config.d directory.${NC}"
 fi
 
-# Ask if the user wants to set up a system service for auto-start
-echo
-echo -e "${BLUE}Do you want to set up the application to start automatically at system boot?${NC}"
-echo -e "This will require sudo privileges to create a systemd service."
-echo -e "1. Yes - set up as a system service (recommended for server installations)"
-echo -e "2. No - I'll start it manually when needed (default)"
-read -p "Enter your choice [2]: " SERVICE_CHOICE
-
-# Default to no if no selection is made
-SERVICE_CHOICE=${SERVICE_CHOICE:-2}
-
-if [ "$SERVICE_CHOICE" = "1" ]; then
-    setup_systemd_service
-    SERVICE_SETUP_RESULT=$?
-fi
-
 # All done
 echo
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}     Installation Complete!          ${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo
-
-if [ "$SERVICE_CHOICE" = "1" ] && [ $SERVICE_SETUP_RESULT -eq 0 ]; then
-    echo -e "You can access the Odoo Developer Tools UI:"
-    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://localhost:5000${NC}"
-    echo -e "  2. The service will start automatically when your system boots"
-    echo -e "  3. To control the service: ${YELLOW}sudo systemctl [start|stop|restart|status] odoo-developer-tools.service${NC}"
-else
-    echo -e "You can run the Odoo Developer Tools UI:"
-    echo -e "  1. From your desktop applications menu"
-    echo -e "  2. By running ${BLUE}$SCRIPT_DIR/main.py${NC}"
-fi
-
+echo -e "You can now run the Odoo Developer Tools UI:"
+echo -e "  1. From your desktop applications menu"
+echo -e "  2. By running ${BLUE}$SCRIPT_DIR/main.py${NC}"
 echo
 echo -e "Enjoy using Odoo Developer Tools UI!"
