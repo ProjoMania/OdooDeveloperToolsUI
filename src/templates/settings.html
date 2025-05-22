@@ -5,95 +5,156 @@
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
-<div class="row mt-4">
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Application Settings</h5>
-            </div>
-            <div class="card-body">
-                <form method="post" action="{{ url_for('settings') }}">
-                    <!-- PostgreSQL Settings -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0"><i class="fas fa-database me-2"></i>Database Connection</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="postgres_user" class="form-label">PostgreSQL Username</label>
-                                    <input type="text" class="form-control" id="postgres_user" name="postgres_user" 
-                                           value="{{ settings.get('postgres_user', 'postgres') }}">
-                                    <div class="form-text">Default username for PostgreSQL connections</div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="postgres_password" class="form-label">PostgreSQL Password</label>
-                                    <input type="password" class="form-control" id="postgres_password" name="postgres_password" 
-                                           value="{{ settings.get('postgres_password', '') }}">
-                                    <div class="form-text">Leave empty if using peer authentication</div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="postgres_host" class="form-label">PostgreSQL Host</label>
-                                    <input type="text" class="form-control" id="postgres_host" name="postgres_host" 
-                                           value="{{ settings.get('postgres_host', 'localhost') }}">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="postgres_port" class="form-label">PostgreSQL Port</label>
-                                    <input type="number" class="form-control" id="postgres_port" name="postgres_port" 
-                                           value="{{ settings.get('postgres_port', '5432') }}">
-                                </div>
-                            </div>
+<div class="container mt-4">
+    <h1>Settings</h1>
+    
+    <!-- Premium Account Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Premium Account</h5>
+            {% if current_user.is_authenticated %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="card-text">
+                            <strong>Account Status:</strong> 
+                            {% if current_user.has_active_subscription %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-warning">Free</span>
+                            {% endif %}
+                        </p>
+                        <p class="card-text">
+                            <strong>Plan:</strong> {{ current_user.subscription_tier|title }}<br>
+                            {% if current_user.subscription_expires_at %}
+                            <strong>Expires:</strong> {{ current_user.subscription_expires_at.strftime('%Y-%m-%d') }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Premium Features:</h6>
+                        <ul>
+                            <li>Data Synchronization</li>
+                            <li>Multi-device Access</li>
+                            <li>Advanced Analytics</li>
+                            <li>Priority Support</li>
+                        </ul>
+                    </div>
+                </div>
+            {% else %}
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6>Upgrade to Premium</h6>
+                        <p>Get access to premium features and enhance your development workflow:</p>
+                        <ul>
+                            <li>Sync your data across multiple devices</li>
+                            <li>Access advanced analytics and reporting</li>
+                            <li>Get priority support</li>
+                            <li>And much more!</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <a href="http://127.0.0.1:8000" class="btn btn-primary btn-lg" target="_blank">Upgrade Now</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Application Settings -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Application Settings</h5>
+            <form method="POST">
+                <!-- PostgreSQL Settings -->
+                <h6 class="mt-3">PostgreSQL Settings</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="postgres_user">Username</label>
+                            <input type="text" class="form-control" id="postgres_user" name="postgres_user" 
+                                   value="{{ settings.postgres_user }}" required>
                         </div>
                     </div>
-
-                    <!-- File Paths Settings -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0"><i class="fas fa-folder me-2"></i>File Paths</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label for="filestore_dir" class="form-label">Filestore Directory</label>
-                                <input type="text" class="form-control" id="filestore_dir" name="filestore_dir" 
-                                       value="{{ settings.get('filestore_dir', filestore_dir) }}">
-                                <div class="form-text">Directory where Odoo filestore folders are stored</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="upload_folder" class="form-label">Upload Folder</label>
-                                <input type="text" class="form-control" id="upload_folder" name="upload_folder" 
-                                       value="{{ settings.get('upload_folder', upload_folder) }}">
-                                <div class="form-text">Temporary directory for file uploads</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="ssh_config_dir" class="form-label">SSH Config Directory</label>
-                                <input type="text" class="form-control" id="ssh_config_dir" name="ssh_config_dir" 
-                                       value="{{ settings.get('ssh_config_dir', ssh_config_dir) }}">
-                                <div class="form-text">Directory for SSH configuration files</div>
-                            </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="postgres_password">Password</label>
+                            <input type="password" class="form-control" id="postgres_password" name="postgres_password" 
+                                   value="{{ settings.postgres_password }}">
                         </div>
                     </div>
-
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button type="button" class="btn btn-outline-secondary me-md-2" onclick="resetSettings()">
-                            <i class="fas fa-undo me-1"></i> Reset to Defaults
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i> Save Settings
-                        </button>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="postgres_host">Host</label>
+                            <input type="text" class="form-control" id="postgres_host" name="postgres_host" 
+                                   value="{{ settings.postgres_host }}" required>
+                        </div>
                     </div>
-                </form>
-            </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="postgres_port">Port</label>
+                            <input type="text" class="form-control" id="postgres_port" name="postgres_port" 
+                                   value="{{ settings.postgres_port }}" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- File Paths -->
+                <h6 class="mt-4">File Paths</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="filestore_dir">Filestore Directory</label>
+                            <input type="text" class="form-control" id="filestore_dir" name="filestore_dir" 
+                                   value="{{ settings.filestore_dir }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="upload_folder">Upload Folder</label>
+                            <input type="text" class="form-control" id="upload_folder" name="upload_folder" 
+                                   value="{{ settings.upload_folder }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="ssh_config_dir">SSH Config Directory</label>
+                            <input type="text" class="form-control" id="ssh_config_dir" name="ssh_config_dir" 
+                                   value="{{ settings.ssh_config_dir }}" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Application Settings -->
+                <h6 class="mt-4">Application Settings</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="default_odoo_version">Default Odoo Version</label>
+                            <input type="text" class="form-control" id="default_odoo_version" name="default_odoo_version" 
+                                   value="{{ settings.default_odoo_version }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" class="form-check-input" id="auto_backup_before_drop" 
+                                   name="auto_backup_before_drop" {% if settings.auto_backup_before_drop == 'true' %}checked{% endif %}>
+                            <label class="form-check-label" for="auto_backup_before_drop">Auto Backup Before Drop</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" class="form-check-input" id="dark_mode" name="dark_mode" 
+                                   {% if settings.dark_mode == 'true' %}checked{% endif %}>
+                            <label class="form-check-label" for="dark_mode">Dark Mode</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
+            </form>
         </div>
     </div>
 </div>
-
-<script>
-function resetSettings() {
-    if (confirm("Are you sure you want to reset all settings to their default values?")) {
-        window.location.href = "{{ url_for('reset_settings') }}";
-    }
-}
-</script>
 {% endblock %}

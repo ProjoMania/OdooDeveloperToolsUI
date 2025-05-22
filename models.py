@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 
 db = SQLAlchemy()
 
@@ -93,8 +94,8 @@ class ProjectDatabase(db.Model):
     def __repr__(self):
         return f'<ProjectDatabase {self.database_name} for Project {self.project_id}>'
 
-# User Model (for future authentication)
-class User(db.Model):
+# User Model
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -102,6 +103,31 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # GitHub OAuth fields
+    github_id = db.Column(db.String(100), unique=True)
+    github_access_token = db.Column(db.String(255))
+    github_username = db.Column(db.String(100))
+    
+    # Subscription fields
+    subscription_id = db.Column(db.String(100), unique=True)
+    subscription_status = db.Column(db.String(20), default='free')  # free, active, expired, cancelled
+    subscription_tier = db.Column(db.String(20), default='free')  # free, basic, pro, enterprise
+    subscription_expires_at = db.Column(db.DateTime)
+    
+    @property
+    def has_active_subscription(self):
+        """Check if user has an active subscription"""
+        if not self.subscription_status or self.subscription_status == 'free':
+            return False
+        if self.subscription_status == 'active' and self.subscription_expires_at:
+            return datetime.utcnow() < self.subscription_expires_at
+        return False
+    
+    @property
+    def can_access_premium_features(self):
+        """Check if user can access premium features"""
+        return self.has_active_subscription and self.subscription_tier in ['basic', 'pro', 'enterprise']
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

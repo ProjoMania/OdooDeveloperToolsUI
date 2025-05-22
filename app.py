@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Developer Management Tool - Comprehensive developer workspace management
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask_login import LoginManager, login_required, current_user
 import requests
 import os
 import psycopg2
@@ -17,7 +18,8 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
 import markdown
-from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting
+from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting, User
+from auth import check_subscription_status, subscription_required, premium_feature_required, get_subscription_portal_url
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -31,6 +33,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
 db.init_app(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 # Register API blueprint
 app.register_blueprint(api_bp)
@@ -53,6 +64,15 @@ os.makedirs(FILESTORE_DIR, exist_ok=True)
 
 # === Helper Functions ===
 
+def get_setting(key, default=None):
+    """Get a setting value from the database"""
+    try:
+        setting = Setting.query.filter_by(key=key).first()
+        return setting.value if setting else default
+    except Exception as e:
+        logger.error(f"Error getting setting {key}: {str(e)}")
+        return default
+
 def get_db_connection():
     """Create a connection to PostgreSQL using settings from the database"""
     try:
@@ -63,6 +83,8 @@ def get_db_connection():
             password = get_setting('postgres_password', '')
             host = get_setting('postgres_host', 'localhost')
             port = get_setting('postgres_port', '5432')
+
+        logger.info(f"Attempting to connect to PostgreSQL at {host}:{port} as user {user}")
 
         # Build connection string based on whether password is provided
         if password:
@@ -83,9 +105,11 @@ def get_db_connection():
             )
             
         conn.autocommit = True
+        logger.info("Successfully connected to PostgreSQL")
         return conn
     except Exception as e:
         logger.error(f"Database connection error: {str(e)}")
+        flash(f'Could not connect to PostgreSQL: {str(e)}', 'danger')
         return None
 
 def format_size(size_bytes):
@@ -367,109 +391,122 @@ def list_databases():
     conn = get_db_connection()
     
     if not conn:
-        flash('Could not connect to PostgreSQL. Please check your credentials.', 'danger')
         return render_template('databases.html', databases=[])
     
-    cursor = conn.cursor()
-    
-    # Get all databases with size
-    cursor.execute("""
-        SELECT 
-            d.datname AS database_name, 
-            u.usename AS owner,
-            pg_database_size(d.datname) AS size_bytes
-        FROM 
-            pg_database d
-            JOIN pg_user u ON d.datdba = u.usesysid
-        WHERE 
-            d.datname NOT IN ('postgres', 'template0', 'template1')
-        ORDER BY 
-            d.datname
-    """)
-    
-    db_rows = cursor.fetchall()
-    databases = []
-    
-    for db_name, owner, size_bytes in db_rows:
-        # Format database size
-        db_size = format_size(size_bytes)
+    try:
+        cursor = conn.cursor()
         
-        # Check if it's an Odoo database and get version
-        odoo_version = "Not Odoo DB"
-        try:
-            db_conn = psycopg2.connect(dbname=db_name, user="postgres")
-            db_cursor = db_conn.cursor()
+        # Get all databases with size
+        cursor.execute("""
+            SELECT 
+                d.datname AS database_name, 
+                u.usename AS owner,
+                pg_database_size(d.datname) AS size_bytes
+            FROM 
+                pg_database d
+                JOIN pg_user u ON d.datdba = u.usesysid
+            WHERE 
+                d.datname NOT IN ('postgres', 'template0', 'template1')
+            ORDER BY 
+                d.datname
+        """)
+        
+        db_rows = cursor.fetchall()
+        databases = []
+        
+        for db_name, owner, size_bytes in db_rows:
+            # Format database size
+            db_size = format_size(size_bytes)
             
-            # Check if it's an Odoo database
-            db_cursor.execute("""
-                SELECT 1 FROM information_schema.tables
-                WHERE table_name = 'ir_module_module'
-            """)
-            
-            if db_cursor.fetchone():
-                # Get Odoo version from base module
-                db_cursor.execute("""
-                    SELECT latest_version FROM ir_module_module
-                    WHERE name = 'base' LIMIT 1
-                """)
-                version_row = db_cursor.fetchone()
-                if version_row:
-                    odoo_version = version_row[0]
-                    
-                # Check if it's Enterprise
-                db_cursor.execute("""
-                    SELECT 1 FROM ir_module_module
-                    WHERE name = 'web_enterprise' AND state = 'installed'
-                """)
-                is_enterprise = bool(db_cursor.fetchone())
-                expiration_date = None
-                # Keep the version information for Enterprise databases
-                # The Enterprise/Community status is tracked separately in is_enterprise
-                
-                # Try to get the expiration date for enterprise databases
-                if is_enterprise:
-                    try:
-                        db_cursor.execute("""
-                            SELECT value FROM ir_config_parameter
-                            WHERE key = 'database.expiration_date'
-                        """)
-                        date_row = db_cursor.fetchone()
-                        if date_row:
-                            expiration_date = date_row[0]
-                    except Exception as e:
-                        logger.error(f"Error getting expiration date for {db_name}: {str(e)}")
-            else:
-                is_enterprise = False
-            
-            db_cursor.close()
-            db_conn.close()
-        except Exception:
-            # If database access fails, leave as "Not Odoo DB"
+            # Check if it's an Odoo database and get version
+            odoo_version = "Not Odoo DB"
             is_enterprise = False
+            expiration_date = None
+            
+            try:
+                # Try to connect to the specific database
+                db_conn = psycopg2.connect(
+                    dbname=db_name,
+                    user=get_setting('postgres_user', 'postgres'),
+                    password=get_setting('postgres_password', ''),
+                    host=get_setting('postgres_host', 'localhost'),
+                    port=get_setting('postgres_port', '5432')
+                )
+                db_cursor = db_conn.cursor()
+                
+                # Check if it's an Odoo database
+                db_cursor.execute("""
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = 'ir_module_module'
+                """)
+                
+                if db_cursor.fetchone():
+                    # Get Odoo version from base module
+                    db_cursor.execute("""
+                        SELECT latest_version FROM ir_module_module
+                        WHERE name = 'base' LIMIT 1
+                    """)
+                    version_row = db_cursor.fetchone()
+                    if version_row:
+                        odoo_version = version_row[0]
+                    
+                    # Check if it's Enterprise
+                    db_cursor.execute("""
+                        SELECT 1 FROM ir_module_module
+                        WHERE name = 'web_enterprise' AND state = 'installed'
+                    """)
+                    is_enterprise = bool(db_cursor.fetchone())
+                    
+                    # Try to get the expiration date for enterprise databases
+                    if is_enterprise:
+                        try:
+                            db_cursor.execute("""
+                                SELECT value FROM ir_config_parameter
+                                WHERE key = 'database.expiration_date'
+                            """)
+                            date_row = db_cursor.fetchone()
+                            if date_row:
+                                expiration_date = date_row[0]
+                        except Exception as e:
+                            logger.error(f"Error getting expiration date for {db_name}: {str(e)}")
+                
+                db_cursor.close()
+                db_conn.close()
+            except Exception as e:
+                logger.error(f"Error checking database {db_name}: {str(e)}")
+                # Continue with default values if we can't check the database
+            
+            # Get filestore size
+            filestore_path = os.path.join(FILESTORE_DIR, db_name)
+            if os.path.exists(filestore_path):
+                filestore_bytes = get_dir_size(filestore_path)
+                filestore_size = format_size(filestore_bytes)
+            else:
+                filestore_size = "N/A"
+            
+            # Add database to list
+            databases.append({
+                'name': db_name,
+                'owner': owner,
+                'version': odoo_version,
+                'expiration_date': expiration_date,
+                'size': db_size,
+                'filestore_size': filestore_size,
+                'is_enterprise': is_enterprise
+            })
         
-        # Get filestore size
-        filestore_path = os.path.join(FILESTORE_DIR, db_name)
-        if os.path.exists(filestore_path):
-            filestore_bytes = get_dir_size(filestore_path)
-            filestore_size = format_size(filestore_bytes)
-        else:
-            filestore_size = "N/A"
+        cursor.close()
+        conn.close()
         
-        # Add database to list
-        databases.append({
-            'name': db_name,
-            'owner': owner,
-            'version': odoo_version,
-            'expiration_date': expiration_date,
-            'size': db_size,
-            'filestore_size': filestore_size,
-            'is_enterprise': is_enterprise
-        })
-    
-    cursor.close()
-    conn.close()
-    
-    return render_template('databases.html', databases=databases)
+        if not databases:
+            flash('No databases found. Please check your PostgreSQL connection settings.', 'warning')
+        
+        return render_template('databases.html', databases=databases)
+        
+    except Exception as e:
+        logger.error(f"Error listing databases: {str(e)}")
+        flash(f'Error listing databases: {str(e)}', 'danger')
+        return render_template('databases.html', databases=[])
 
 @app.route('/databases/drop/<db_name>', methods=['GET', 'POST'])
 def drop_database(db_name):
@@ -779,7 +816,7 @@ def extend_enterprise(db_name=None):
             db_cursor.close()
             db_conn.close()
         except Exception as e:
-            logger.error(f"Error checking database {db_name}: {str(e)}")
+            logger.error(f"Error checking database {dbs_name}: {str(e)}")
             # Skip databases that can't be accessed
             pass
     
@@ -1375,81 +1412,64 @@ def settings():
         flash('Settings saved successfully', 'success')
         return redirect(url_for('settings'))
     
+    # Check subscription status if user is logged in
+    user = None
+    if current_user.is_authenticated:
+        check_subscription_status(current_user)
+        user = current_user
+    
     return render_template('settings.html', 
                           settings=settings_dict,
                           filestore_dir=FILESTORE_DIR,
                           upload_folder=app.config['UPLOAD_FOLDER'],
-                          ssh_config_dir=SSH_CONFIG_DIR)
+                          ssh_config_dir=SSH_CONFIG_DIR,
+                          user=user)
 
-@app.route('/settings/reset', methods=['GET'])
-def reset_settings():
-    """Reset all settings to their default values"""
-    # Remove all existing settings
-    Setting.query.delete()
-    db.session.commit()
+@app.route('/upgrade')
+@login_required
+def upgrade_subscription():
+    """Redirect to Django portal for subscription upgrade"""
+    if not current_user.github_id:
+        flash('Please connect your GitHub account first', 'warning')
+        return redirect(url_for('github_settings'))
     
-    # Set default settings
-    default_settings = [
-        # PostgreSQL settings
-        ('postgres_user', 'postgres', 'Default PostgreSQL username'),
-        ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
-        ('postgres_host', 'localhost', 'PostgreSQL server hostname'),
-        ('postgres_port', '5432', 'PostgreSQL server port'),
-        
-        # File paths
-        ('filestore_dir', FILESTORE_DIR, 'Directory where Odoo filestore folders are stored'),
-        ('upload_folder', app.config['UPLOAD_FOLDER'], 'Temporary directory for file uploads'),
-        ('ssh_config_dir', SSH_CONFIG_DIR, 'Directory for SSH configuration files'),
-        
-        # Application settings
-        ('default_odoo_version', '17.0', 'Default Odoo version for new projects'),
-        ('auto_backup_before_drop', 'true', 'Create a backup before dropping a database'),
-        ('dark_mode', 'false', 'Use dark theme for the application')
-    ]
+    # Generate a secure token for the Django portal
+    token = generate_subscription_token(current_user)
     
-    # Create default settings
-    for key, value, description in default_settings:
-        setting = Setting(key=key, value=value, description=description)
-        db.session.add(setting)
-    
-    db.session.commit()
-    flash('Settings have been reset to default values', 'success')
-    return redirect(url_for('settings'))
+    # Redirect to Django portal with the token
+    portal_url = get_subscription_portal_url()
+    return redirect(f"{portal_url}/upgrade?token={token}")
 
-def get_setting_description(key):
-    """Get description for a setting key"""
-    descriptions = {
-        'postgres_user': 'Default PostgreSQL username',
-        'postgres_password': 'PostgreSQL password (empty for peer authentication)',
-        'postgres_host': 'PostgreSQL server hostname',
-        'postgres_port': 'PostgreSQL server port',
-        'filestore_dir': 'Directory where Odoo filestore folders are stored',
-        'upload_folder': 'Temporary directory for file uploads',
-        'ssh_config_dir': 'Directory for SSH configuration files',
-        'default_odoo_version': 'Default Odoo version for new projects',
-        'auto_backup_before_drop': 'Create a backup before dropping a database',
-        'dark_mode': 'Use dark theme for the application'
-    }
-    return descriptions.get(key, '')
+def generate_subscription_token(user):
+    """Generate a secure token for subscription portal"""
+    # In production, use a proper JWT or similar token
+    import hashlib
+    import time
+    secret = os.environ.get('SUBSCRIPTION_SECRET_KEY', 'your-secret-key')
+    data = f"{user.github_id}:{user.email}:{time.time()}"
+    return hashlib.sha256(f"{data}:{secret}".encode()).hexdigest()
 
-# Function to get a setting value with default fallback
-def get_setting(key, default=None):
-    """Get a setting value from the database with a default fallback"""
-    setting = Setting.query.filter_by(key=key).first()
-    if setting:
-        return setting.value
-    return default
+# === Premium Feature Routes ===
+@app.route('/premium-features')
+@login_required
+@premium_feature_required
+def premium_features():
+    """Show available premium features"""
+    return render_template('premium_features.html', user=current_user)
 
-# Function to get database connection parameters
-def get_connection_params():
-    """Get PostgreSQL connection parameters from settings"""
-    # Get connection parameters with defaults
-    return {
-        'user': get_setting('postgres_user', 'postgres'),
-        'password': get_setting('postgres_password', ''),
-        'host': get_setting('postgres_host', 'localhost'),
-        'port': get_setting('postgres_port', '5432')
-    }
+# === Login Routes ===
+@app.route('/login')
+def login():
+    """Redirect to Django portal for login"""
+    portal_url = get_subscription_portal_url()
+    return redirect(f"{portal_url}/login?next={request.url}")
+
+@app.route('/logout')
+def logout():
+    """Logout user and redirect to Django portal"""
+    session.clear()
+    portal_url = get_subscription_portal_url()
+    return redirect(f"{portal_url}/logout")
 
 # === Run the Application ===
 if __name__ == '__main__':

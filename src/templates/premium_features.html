@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Premium Features</h1>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Data Synchronization</h5>
+                    <p class="card-text">Sync your data across multiple devices and keep everything up to date.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Real-time sync</li>
+                        <li><i class="fas fa-check text-success"></i> Multi-device support</li>
+                        <li><i class="fas fa-check text-success"></i> Automatic backups</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Advanced Analytics</h5>
+                    <p class="card-text">Get detailed insights into your development workflow and productivity.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Project statistics</li>
+                        <li><i class="fas fa-check text-success"></i> Time tracking</li>
+                        <li><i class="fas fa-check text-success"></i> Custom reports</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Team Collaboration</h5>
+                    <p class="card-text">Work seamlessly with your team members and share resources.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Team workspaces</li>
+                        <li><i class="fas fa-check text-success"></i> Shared resources</li>
+                        <li><i class="fas fa-check text-success"></i> Access control</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Your Subscription Status</h5>
+                    <p class="card-text">
+                        <strong>Current Plan:</strong> {{ user.subscription_tier|title }}<br>
+                        <strong>Status:</strong> {{ user.subscription_status|title }}<br>
+                        {% if user.subscription_expires_at %}
+                        <strong>Expires:</strong> {{ user.subscription_expires_at.strftime('%Y-%m-%d') }}
+                        {% endif %}
+                    </p>
+                    {% if not user.has_active_subscription %}
+                    <a href="{{ url_for('upgrade_subscription') }}" class="btn btn-primary">Upgrade Now</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
