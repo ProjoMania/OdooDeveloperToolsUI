@@ -114,15 +114,16 @@ class User(db.Model, UserMixin):
     subscription_status = db.Column(db.String(20), default='free')  # free, active, expired, cancelled
     subscription_tier = db.Column(db.String(20), default='free')  # free, basic, pro, enterprise
     subscription_expires_at = db.Column(db.DateTime)
+    last_verification = db.Column(db.DateTime)
     
     @property
     def has_active_subscription(self):
         """Check if user has an active subscription"""
         if not self.subscription_status or self.subscription_status == 'free':
             return False
-        if self.subscription_status == 'active' and self.subscription_expires_at:
-            return datetime.utcnow() < self.subscription_expires_at
-        return False
+        if self.subscription_expires_at and self.subscription_expires_at < datetime.now():
+            return False
+        return True
     
     @property
     def can_access_premium_features(self):
