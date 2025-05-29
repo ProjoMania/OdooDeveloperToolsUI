@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Install Odoo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Install Odoo</h2>
+    
+    <!-- Installation Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="installForm" class="needs-validation" novalidate>
+                <div class="row">
+                    <!-- Server Selection -->
+                    <div class="col-md-6 mb-3">
+                        <label for="server" class="form-label">Server</label>
+                        <select class="form-select" id="server" name="server" required>
+                            <option value="">Select a server...</option>
+                            {% for server in servers %}
+                            <option value="{{ server.hostname }}" 
+                                    data-username="{{ server.user }}"
+                                    data-port="{{ server.port }}">
+                                {{ server.host }} ({{ server.hostname }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">Please select a server.</div>
+                    </div>
+
+                    <!-- SSH Password -->
+                    <div class="col-md-6 mb-3">
+                        <label for="server_password" class="form-label">SSH Password</label>
+                        <input type="password" class="form-control" id="server_password" name="server_password" required>
+                        <div class="invalid-feedback">Please enter the SSH password.</div>
+                    </div>
+
+                    <!-- Odoo Version -->
+                    <div class="col-md-6 mb-3">
+                        <label for="odoo_version" class="form-label">Odoo Version</label>
+                        <select class="form-select" id="odoo_version" name="odoo_version" required>
+                            <option value="17.0">17.0</option>
+                            <option value="16.0">16.0</option>
+                            <option value="15.0">15.0</option>
+                        </select>
+                        <div class="invalid-feedback">Please select an Odoo version.</div>
+                    </div>
+
+                    <!-- Odoo User -->
+                    <div class="col-md-6 mb-3">
+                        <label for="odoo_user" class="form-label">Odoo User</label>
+                        <input type="text" class="form-control" id="odoo_user" name="odoo_user" value="odoo" required>
+                        <div class="invalid-feedback">Please enter the Odoo user.</div>
+                    </div>
+
+                    <!-- Port -->
+                    <div class="col-md-6 mb-3">
+                        <label for="port" class="form-label">Port</label>
+                        <input type="number" class="form-control" id="port" name="port" value="8069" required>
+                        <div class="invalid-feedback">Please enter the port number.</div>
+                    </div>
+
+                    <!-- Admin Password -->
+                    <div class="col-md-6 mb-3">
+                        <label for="admin_password" class="form-label">Admin Password</label>
+                        <input type="password" class="form-control" id="admin_password" name="admin_password" required>
+                        <div class="invalid-feedback">Please enter the admin password.</div>
+                    </div>
+
+                    <!-- Additional Options -->
+                    <div class="col-12 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="install_nginx" name="install_nginx">
+                            <label class="form-check-label" for="install_nginx">
+                                Install Nginx
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_enterprise" name="is_enterprise">
+                            <label class="form-check-label" for="is_enterprise">
+                                Enterprise Edition
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Start Installation</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Installation Status -->
+    <div class="card">
+        <div class="card-body">
+            <h3>Installation Status</h3>
+            <div id="installationStatus" class="d-none">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p id="statusMessage" class="mb-0"></p>
+            </div>
+            <div id="noInstallation" class="text-muted">
+                No installation in progress
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('installForm');
+    const statusDiv = document.getElementById('installationStatus');
+    const progressBar = statusDiv.querySelector('.progress-bar');
+    const statusMessage = document.getElementById('statusMessage');
+    const noInstallation = document.getElementById('noInstallation');
+    let currentInstallationId = null;
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            server_host: formData.get('server'),
+            server_username: document.querySelector('#server option:checked').dataset.username,
+            server_password: formData.get('server_password'),
+            odoo_version: formData.get('odoo_version'),
+            odoo_user: formData.get('odoo_user'),
+            port: parseInt(formData.get('port')),
+            install_nginx: formData.get('install_nginx') === 'on',
+            is_enterprise: formData.get('is_enterprise') === 'on',
+            admin_password: formData.get('admin_password')
+        };
+
+        try {
+            const response = await fetch('/api/odoo/install/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                currentInstallationId = result.installation_id;
+                statusDiv.classList.remove('d-none');
+                noInstallation.classList.add('d-none');
+                progressBar.style.width = '0%';
+                statusMessage.textContent = 'Installation started...';
+                startStatusPolling();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    });
+
+    function startStatusPolling() {
+        const pollInterval = setInterval(async () => {
+            if (!currentInstallationId) {
+                clearInterval(pollInterval);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/odoo/installations/${currentInstallationId}/status/`);
+                const result = await response.json();
+
+                if (response.ok) {
+                    updateStatus(result);
+                    if (result.status === 'completed' || result.status === 'failed') {
+                        clearInterval(pollInterval);
+                        currentInstallationId = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+            }
+        }, 5000); // Poll every 5 seconds
+    }
+
+    function updateStatus(status) {
+        let progress = 0;
+        let message = '';
+
+        switch (status.status) {
+            case 'pending':
+                progress = 0;
+                message = 'Installation pending...';
+                break;
+            case 'in_progress':
+                progress = 50;
+                message = 'Installation in progress...';
+                break;
+            case 'completed':
+                progress = 100;
+                message = 'Installation completed successfully!';
+                break;
+            case 'failed':
+                progress = 100;
+                message = 'Installation failed: ' + (status.error_message || 'Unknown error');
+                break;
+        }
+
+        progressBar.style.width = `${progress}%`;
+        statusMessage.textContent = message;
+
+        if (status.status === 'completed' || status.status === 'failed') {
+            setTimeout(() => {
+                statusDiv.classList.add('d-none');
+                noInstallation.classList.remove('d-none');
+            }, 5000);
+        }
+    }
+});
+</script>
+{% endblock %} 

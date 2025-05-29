@@ -5,6 +5,11 @@ from flask import Blueprint, jsonify, request
 import psycopg2
 import requests
 import logging
+from flask_login import login_required, current_user
+from src.database import db
+from models import OdooInstallation
+from src.odoo_installer.installer import OdooInstaller, OdooInstallConfig
+import threading
 
 # Create a blueprint for API endpoints
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -199,3 +204,122 @@ def submit_migration_request():
             'success': False,
             'message': f"An unexpected error occurred: {str(e)}"
         }), 500
+
+@api_bp.route('/odoo/install/', methods=['POST'])
+@login_required
+def start_odoo_installation():
+    """Start a new Odoo installation"""
+    try:
+        data = request.get_json()
+        
+        # Create installation record
+        installation = OdooInstallation(
+            user_id=current_user.id,
+            server_host=data['server_host'],
+            server_username=data['server_username'],
+            odoo_version=data['odoo_version'],
+            odoo_user=data.get('odoo_user', 'odoo'),
+            port=data.get('port', 8069),
+            install_nginx=data.get('install_nginx', False),
+            is_enterprise=data.get('is_enterprise', False),
+            admin_password=data['admin_password'],
+            status='pending'
+        )
+        db.session.add(installation)
+        db.session.commit()
+
+        # Start installation in background thread
+        thread = threading.Thread(
+            target=perform_installation,
+            args=(installation.id, data)
+        )
+        thread.start()
+
+        return jsonify({
+            'message': 'Installation started',
+            'installation_id': installation.id
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def perform_installation(installation_id, data):
+    """Perform the actual installation in a background thread"""
+    try:
+        installation = OdooInstallation.query.get(installation_id)
+        if not installation:
+            return
+
+        installation.status = 'in_progress'
+        db.session.commit()
+
+        # Create installer configuration
+        config = OdooInstallConfig(
+            version=installation.odoo_version,
+            user=installation.odoo_user,
+            port=installation.port,
+            install_nginx=installation.install_nginx,
+            is_enterprise=installation.is_enterprise,
+            admin_password=installation.admin_password
+        )
+
+        # Create installer instance
+        installer = OdooInstaller(
+            host=installation.server_host,
+            username=installation.server_username,
+            password=data.get('server_password')
+        )
+
+        # Perform installation
+        success = installer.install_odoo(config)
+
+        if success:
+            installation.status = 'completed'
+        else:
+            installation.status = 'failed'
+            installation.error_message = 'Installation failed'
+
+    except Exception as e:
+        installation.status = 'failed'
+        installation.error_message = str(e)
+
+    finally:
+        db.session.commit()
+
+@api_bp.route('/odoo/installations/<int:installation_id>/status/')
+@login_required
+def get_installation_status(installation_id):
+    """Get the status of an installation"""
+    try:
+        installation = OdooInstallation.query.get_or_404(installation_id)
+        if installation.user_id != current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        return jsonify({
+            'status': installation.status,
+            'error_message': installation.error_message,
+            'created_at': installation.created_at.isoformat(),
+            'updated_at': installation.updated_at.isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/odoo/installations/')
+@login_required
+def list_installations():
+    """List all installations for the current user"""
+    try:
+        installations = OdooInstallation.query.filter_by(user_id=current_user.id).all()
+        data = [{
+            'id': inst.id,
+            'odoo_version': inst.odoo_version,
+            'server_host': inst.server_host,
+            'status': inst.status,
+            'created_at': inst.created_at.isoformat(),
+            'updated_at': inst.updated_at.isoformat()
+        } for inst in installations]
+        return jsonify({'installations': data})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

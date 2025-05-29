@@ -7,6 +7,7 @@ import os
 import psycopg2
 import paramiko
 from src.api_endpoints import api_bp
+from src.database import db
 import subprocess
 import json
 import re
@@ -18,8 +19,9 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
 import markdown
-from models import db, Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting, User
+from models import Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting, User
 from auth import check_subscription_status, subscription_required, premium_feature_required, get_subscription_portal_url
+from src.portal_auth import get_portal_user_status, premium_required
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -1369,6 +1371,10 @@ def unlink_database(project_id, database_id):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     """Application settings page"""
+    # Get portal user status for premium check
+    portal_status = get_portal_user_status()
+    is_premium = portal_status and portal_status.get('is_premium', False)
+    
     # Get all settings from the database
     all_settings = Setting.query.all()
     settings_dict = {}
@@ -1423,7 +1429,8 @@ def settings():
                           filestore_dir=FILESTORE_DIR,
                           upload_folder=app.config['UPLOAD_FOLDER'],
                           ssh_config_dir=SSH_CONFIG_DIR,
-                          user=user)
+                          user=user,
+                          is_premium=is_premium)
 
 @app.route('/upgrade')
 @login_required
@@ -1456,6 +1463,14 @@ def generate_subscription_token(user):
 def premium_features():
     """Show available premium features"""
     return render_template('premium_features.html', user=current_user)
+
+@app.route('/odoo/install')
+@login_required
+@premium_required
+def odoo_install():
+    """Odoo installation page"""
+    servers = get_ssh_servers()
+    return render_template('odoo_install.html', servers=servers)
 
 # === Login Routes ===
 @app.route('/login')

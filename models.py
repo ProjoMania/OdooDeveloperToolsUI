@@ -1,9 +1,7 @@
-from flask_sqlalchemy import SQLAlchemy
+from src.database import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-
-db = SQLAlchemy()
 
 # Project Model
 class Project(db.Model):
@@ -152,3 +150,25 @@ class Setting(db.Model):
     
     def __repr__(self):
         return f'<Setting {self.key}>'
+
+class OdooInstallation(db.Model):
+    """Model for tracking Odoo installations"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    server_host = db.Column(db.String(255), nullable=False)
+    server_username = db.Column(db.String(255), nullable=False)
+    odoo_version = db.Column(db.String(10), nullable=False)
+    odoo_user = db.Column(db.String(255), nullable=False, default='odoo')
+    port = db.Column(db.Integer, nullable=False, default=8069)
+    install_nginx = db.Column(db.Boolean, nullable=False, default=False)
+    is_enterprise = db.Column(db.Boolean, nullable=False, default=False)
+    admin_password = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('odoo_installations', lazy=True))
+
+    def __repr__(self):
+        return f'<OdooInstallation {self.id}>'
