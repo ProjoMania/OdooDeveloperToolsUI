@@ -134,10 +134,21 @@
                     </div>
                 </div>
 
-                <div class="form-group mb-3">
-                    <label for="custom_addons_path" class="form-label">Custom Addons Path</label>
-                    <input type="text" class="form-control" id="custom_addons_path" name="custom_addons_path" placeholder="/opt/odoo/custom-addons">
-                    <small class="form-text text-muted">Optional: Path for custom addon modules</small>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="custom_addons_path" class="form-label">Custom Addons Path</label>
+                            <input type="text" class="form-control" id="custom_addons_path" name="custom_addons_path" placeholder="/opt/odoo/custom-addons">
+                            <small class="form-text text-muted">Optional: Path for custom addon modules</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="ssh_password" class="form-label">SSH Password</label>
+                            <input type="password" class="form-control" id="ssh_password" name="ssh_password" placeholder="Leave empty to use SSH key">
+                            <small class="form-text text-muted">Required if not using SSH key authentication</small>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group mb-3">
@@ -161,11 +172,11 @@
         </div>
     </div>
 
-    <!-- Premium Server Management Features -->
+    <!-- Server Management Features -->
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0">
-                <i class="fas fa-crown me-2 text-warning"></i>Server Management
+                <i class="fas fa-cog me-2"></i>Server Management
             </h5>
         </div>
         <div class="card-body">
@@ -266,6 +277,7 @@ document.getElementById('odooInstallForm').addEventListener('submit', function(e
         server_hostname: serverHostname,
         server_user: serverUser,
         server_port: serverPort,
+        server_ssh_password: formData.get('ssh_password'),  // Include SSH password/key
         odoo_version: formData.get('odoo_version'),
         install_user: formData.get('install_user'),
         port: parseInt(formData.get('port')),
@@ -407,7 +419,7 @@ document.querySelector('.copy-ssh-command').addEventListener('click', function()
     });
 });
 
-// Premium features - Service Management
+// Server Management Functions - Django will handle premium authentication
 function manageService(action) {
     const data = {
         server_host: serverHost,
@@ -421,7 +433,11 @@ function manageService(action) {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.message || `Service ${action} completed`);
+        if (data.success) {
+            alert(data.message || `Service ${action} completed`);
+        } else {
+            alert(`Error: ${data.message}`);
+        }
     })
     .catch(error => {
         alert(`Error: ${error}`);
@@ -432,7 +448,11 @@ function getServiceStatus() {
     fetch(`/api/odoo/service/status?host=${serverHost}`)
         .then(response => response.json())
         .then(data => {
-            alert(`Service Status: ${data.status}\n${data.details || ''}`);
+            if (data.success || data.status) {
+                alert(`Service Status: ${data.status}\n${data.details || data.message || ''}`);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
         });
 }
 
@@ -450,7 +470,11 @@ function pullFromGithub() {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.message || 'Git pull completed');
+        if (data.success) {
+            alert(data.message || 'Git pull completed');
+        } else {
+            alert(`Error: ${data.message}`);
+        }
     });
 }
 
@@ -462,9 +486,13 @@ function showModuleManager() {
         .then(data => {
             const select = document.getElementById('moduleDatabase');
             select.innerHTML = '<option value="">Select database...</option>';
-            data.databases.forEach(db => {
-                select.innerHTML += `<option value="${db}">${db}</option>`;
-            });
+            if (data.success && data.databases) {
+                data.databases.forEach(db => {
+                    select.innerHTML += `<option value="${db}">${db}</option>`;
+                });
+            } else {
+                select.innerHTML += `<option value="">Error: ${data.message || 'Unable to load databases'}</option>`;
+            }
         });
     
     new bootstrap.Modal(document.getElementById('moduleManagerModal')).show();
@@ -494,8 +522,12 @@ function executeModuleAction() {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.message || `Module ${action} completed`);
-        bootstrap.Modal.getInstance(document.getElementById('moduleManagerModal')).hide();
+        if (data.success) {
+            alert(data.message || `Module ${action} completed`);
+            bootstrap.Modal.getInstance(document.getElementById('moduleManagerModal')).hide();
+        } else {
+            alert(`Error: ${data.message}`);
+        }
     });
 }
 

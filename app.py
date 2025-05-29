@@ -394,15 +394,7 @@ def ssh_connect():
 
 @app.route('/ssh/<host>/details')
 def ssh_server_details(host):
-    """SSH Server details page for managing servers and installing Odoo - Premium only"""
-    portal_status = get_portal_user_status()
-    is_premium = portal_status and portal_status.get('is_premium', False)
-    
-    # Check if user has premium access
-    if not is_premium:
-        flash('Premium subscription required to access server details and management features.', 'warning')
-        return redirect(url_for('ssh_servers'))
-    
+    """SSH Server details page for managing servers and installing Odoo"""
     servers = get_ssh_servers()
     
     # Find the specific server
@@ -416,7 +408,7 @@ def ssh_server_details(host):
         flash(f'SSH server "{host}" not found', 'danger')
         return redirect(url_for('ssh_servers'))
     
-    return render_template('ssh_server_details.html', server=server, is_premium=is_premium)
+    return render_template('ssh_server_details.html', server=server)
 
 # === Database Routes ===
 
