@@ -1,0 +1,506 @@
+{% extends "base.html" %}
+
+{% block title %}SSH Server Details - {{ server.host }}{% endblock %}
+
+{% block page_title %}SSH Server Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ server.host }} Details</h1>
+        <a href="{{ url_for('ssh_servers') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to SSH Servers
+        </a>
+    </div>
+
+    <!-- Server Information Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-server me-2"></i>Server Information
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>Host:</strong></td>
+                            <td>{{ server.host }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>IP/Domain:</strong></td>
+                            <td>{{ server.hostname }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>User:</strong></td>
+                            <td>{{ server.user or 'Default' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Port:</strong></td>
+                            <td>{{ server.port }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Key File:</strong></td>
+                            <td class="text-truncate" style="max-width: 300px;" title="{{ server.key_file }}">
+                                {{ server.key_file or 'Not specified' }}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="connectToServer('{{ server.host }}')">
+                            <i class="bi bi-terminal"></i> Connect via SSH
+                        </button>
+                        <button class="btn btn-outline-primary copy-ssh-command" data-host="{{ server.host }}">
+                            <i class="bi bi-copy"></i> Copy SSH Command
+                        </button>
+                        <a href="{{ url_for('delete_ssh_server', host=server.host) }}" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Delete Server
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Odoo Installation Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-download me-2"></i>Install New Odoo Instance
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="installation-status" class="alert d-none mb-3"></div>
+            
+            <form id="odooInstallForm">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="odoo_version" class="form-label">Odoo Version</label>
+                            <select class="form-control" id="odoo_version" name="odoo_version" required>
+                                <option value="">Select version...</option>
+                                <option value="17.0" selected>17.0 (Latest)</option>
+                                <option value="16.0">16.0</option>
+                                <option value="15.0">15.0</option>
+                                <option value="14.0">14.0</option>
+                                <option value="13.0">13.0</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="install_user" class="form-label">Install User</label>
+                            <input type="text" class="form-control" id="install_user" name="install_user" value="odoo" required>
+                            <small class="form-text text-muted">System user for Odoo installation</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="port" name="port" value="8069" min="1024" max="65535" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="database_name" class="form-label">Initial Database Name</label>
+                            <input type="text" class="form-control" id="database_name" name="database_name" placeholder="Optional">
+                            <small class="form-text text-muted">Leave empty to skip database creation</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="install_nginx" name="install_nginx">
+                            <label class="form-check-label" for="install_nginx">
+                                Install and configure Nginx
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="install_enterprise" name="install_enterprise">
+                            <label class="form-check-label" for="install_enterprise">
+                                Install Odoo Enterprise
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="custom_addons_path" class="form-label">Custom Addons Path</label>
+                    <input type="text" class="form-control" id="custom_addons_path" name="custom_addons_path" placeholder="/opt/odoo/custom-addons">
+                    <small class="form-text text-muted">Optional: Path for custom addon modules</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="github_repo" class="form-label">GitHub Repository (for custom addons)</label>
+                    <input type="url" class="form-control" id="github_repo" name="github_repo" placeholder="https://github.com/username/repo.git">
+                    <small class="form-text text-muted">Optional: Git repository URL for custom addons</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="installation_notes" class="form-label">Installation Notes</label>
+                    <textarea class="form-control" id="installation_notes" name="installation_notes" rows="3" placeholder="Additional configuration notes..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-success btn-lg" id="installBtn">
+                    <i class="bi bi-download"></i> Start Installation
+                </button>
+                <button type="button" class="btn btn-secondary" id="checkStatusBtn" style="display: none;">
+                    <i class="bi bi-refresh"></i> Check Status
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Premium Server Management Features -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-crown me-2 text-warning"></i>Server Management
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <h6>Service Management</h6>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-success" onclick="manageService('start')">
+                            <i class="fas fa-play"></i> Start Odoo
+                        </button>
+                        <button type="button" class="btn btn-warning" onclick="manageService('restart')">
+                            <i class="fas fa-redo"></i> Restart Odoo
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="manageService('stop')">
+                            <i class="fas fa-stop"></i> Stop Odoo
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="getServiceStatus()">
+                            <i class="fas fa-info-circle"></i> Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <h6>Custom Addons Management</h6>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-primary" onclick="pullFromGithub()">
+                            <i class="fab fa-github"></i> Pull Updates
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="showModuleManager()">
+                            <i class="fas fa-puzzle-piece"></i> Manage Modules
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="viewLogs()">
+                            <i class="fas fa-file-text"></i> View Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Module Management Modal -->
+<div class="modal fade" id="moduleManagerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Module Management</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group mb-3">
+                    <label for="moduleDatabase">Select Database</label>
+                    <select class="form-control" id="moduleDatabase">
+                        <option value="">Loading databases...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="moduleAction">Action</label>
+                    <select class="form-control" id="moduleAction">
+                        <option value="install">Install Module</option>
+                        <option value="upgrade">Upgrade Module</option>
+                        <option value="uninstall">Uninstall Module</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="moduleName">Module Name</label>
+                    <input type="text" class="form-control" id="moduleName" placeholder="e.g., sale, purchase, custom_module">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeModuleAction()">Execute</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Server host and details for JavaScript functions
+const serverHost = '{{ server.host }}';
+const serverHostname = '{{ server.hostname }}';
+const serverUser = '{{ server.user }}';
+const serverPort = '{{ server.port }}';
+
+// Installation form handling
+document.getElementById('odooInstallForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const installData = {
+        server_host: serverHost,
+        server_hostname: serverHostname,
+        server_user: serverUser,
+        server_port: serverPort,
+        odoo_version: formData.get('odoo_version'),
+        install_user: formData.get('install_user'),
+        port: parseInt(formData.get('port')),
+        database_name: formData.get('database_name'),
+        install_nginx: formData.get('install_nginx') === 'on',
+        install_enterprise: formData.get('install_enterprise') === 'on',
+        custom_addons_path: formData.get('custom_addons_path'),
+        github_repo: formData.get('github_repo'),
+        installation_notes: formData.get('installation_notes')
+    };
+    
+    // Show loading state
+    const installBtn = document.getElementById('installBtn');
+    const checkStatusBtn = document.getElementById('checkStatusBtn');
+    const statusDiv = document.getElementById('installation-status');
+    
+    installBtn.disabled = true;
+    installBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting Installation...';
+    
+    // Send to Django portal for processing
+    fetch('/api/odoo/install', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(installData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.innerHTML = `
+                <i class="fas fa-check-circle"></i> 
+                Installation started successfully! 
+                <strong>Installation ID:</strong> ${data.installation_id}
+            `;
+            statusDiv.classList.remove('d-none');
+            
+            checkStatusBtn.style.display = 'inline-block';
+            checkStatusBtn.setAttribute('data-installation-id', data.installation_id);
+            
+            // Auto-check status every 10 seconds
+            checkInstallationStatus(data.installation_id);
+        } else {
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${data.message}`;
+            statusDiv.classList.remove('d-none');
+            
+            installBtn.disabled = false;
+            installBtn.innerHTML = '<i class="bi bi-download"></i> Start Installation';
+        }
+    })
+    .catch(error => {
+        statusDiv.className = 'alert alert-danger';
+        statusDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Network error: ${error}`;
+        statusDiv.classList.remove('d-none');
+        
+        installBtn.disabled = false;
+        installBtn.innerHTML = '<i class="bi bi-download"></i> Start Installation';
+    });
+});
+
+// Check installation status
+function checkInstallationStatus(installationId) {
+    fetch(`/api/odoo/install/${installationId}/status`)
+        .then(response => response.json())
+        .then(data => {
+            const statusDiv = document.getElementById('installation-status');
+            const installBtn = document.getElementById('installBtn');
+            
+            if (data.status === 'completed') {
+                statusDiv.className = 'alert alert-success';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-check-circle"></i> 
+                    Installation completed successfully!
+                    ${data.message ? `<br><small>${data.message}</small>` : ''}
+                `;
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="bi bi-download"></i> Start Installation';
+            } else if (data.status === 'failed') {
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle"></i> 
+                    Installation failed: ${data.message}
+                `;
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="bi bi-download"></i> Start Installation';
+            } else if (data.status === 'running') {
+                statusDiv.className = 'alert alert-info';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-spinner fa-spin"></i> 
+                    Installation in progress... ${data.message || ''}
+                `;
+                // Continue checking
+                setTimeout(() => checkInstallationStatus(installationId), 10000);
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+        });
+}
+
+// Manual status check
+document.getElementById('checkStatusBtn').addEventListener('click', function() {
+    const installationId = this.getAttribute('data-installation-id');
+    if (installationId) {
+        checkInstallationStatus(installationId);
+    }
+});
+
+// SSH connection
+function connectToServer(host) {
+    fetch(`/ssh/generate_command/${host}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.command) {
+                // Try to open in terminal (platform-specific)
+                if (navigator.platform.includes('Linux')) {
+                    // For Linux, try common terminal emulators
+                    const terminals = ['gnome-terminal', 'konsole', 'xterm'];
+                    alert(`Run this command in your terminal:\n${data.command}`);
+                } else {
+                    alert(`SSH Command:\n${data.command}`);
+                }
+            }
+        });
+}
+
+// Copy SSH command
+document.querySelector('.copy-ssh-command').addEventListener('click', function() {
+    const host = this.getAttribute('data-host');
+    navigator.clipboard.writeText(`ssh ${host}`).then(() => {
+        // Show temporary feedback
+        const originalText = this.innerHTML;
+        this.innerHTML = '<i class="bi bi-check"></i> Copied';
+        setTimeout(() => {
+            this.innerHTML = originalText;
+        }, 2000);
+    });
+});
+
+// Premium features - Service Management
+function manageService(action) {
+    const data = {
+        server_host: serverHost,
+        action: action
+    };
+    
+    fetch('/api/odoo/service', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message || `Service ${action} completed`);
+    })
+    .catch(error => {
+        alert(`Error: ${error}`);
+    });
+}
+
+function getServiceStatus() {
+    fetch(`/api/odoo/service/status?host=${serverHost}`)
+        .then(response => response.json())
+        .then(data => {
+            alert(`Service Status: ${data.status}\n${data.details || ''}`);
+        });
+}
+
+// Git operations
+function pullFromGithub() {
+    const data = {
+        server_host: serverHost,
+        action: 'pull_updates'
+    };
+    
+    fetch('/api/odoo/git-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message || 'Git pull completed');
+    });
+}
+
+// Module management
+function showModuleManager() {
+    // Load databases first
+    fetch(`/api/odoo/databases?host=${serverHost}`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('moduleDatabase');
+            select.innerHTML = '<option value="">Select database...</option>';
+            data.databases.forEach(db => {
+                select.innerHTML += `<option value="${db}">${db}</option>`;
+            });
+        });
+    
+    new bootstrap.Modal(document.getElementById('moduleManagerModal')).show();
+}
+
+function executeModuleAction() {
+    const database = document.getElementById('moduleDatabase').value;
+    const action = document.getElementById('moduleAction').value;
+    const moduleName = document.getElementById('moduleName').value;
+    
+    if (!database || !moduleName) {
+        alert('Please select database and enter module name');
+        return;
+    }
+    
+    const data = {
+        server_host: serverHost,
+        database: database,
+        action: action,
+        module: moduleName
+    };
+    
+    fetch('/api/odoo/module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message || `Module ${action} completed`);
+        bootstrap.Modal.getInstance(document.getElementById('moduleManagerModal')).hide();
+    });
+}
+
+function viewLogs() {
+    window.open(`/api/odoo/logs?host=${serverHost}`, '_blank');
+}
+</script>
+{% endblock %} 

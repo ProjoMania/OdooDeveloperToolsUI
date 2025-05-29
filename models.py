@@ -1,8 +1,7 @@
-from flask_sqlalchemy import SQLAlchemy
+from src.database import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-
-db = SQLAlchemy()
+from flask_login import UserMixin
 
 # Project Model
 class Project(db.Model):
@@ -93,8 +92,8 @@ class ProjectDatabase(db.Model):
     def __repr__(self):
         return f'<ProjectDatabase {self.database_name} for Project {self.project_id}>'
 
-# User Model (for future authentication)
-class User(db.Model):
+# User Model
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -102,6 +101,32 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # GitHub OAuth fields
+    github_id = db.Column(db.String(100), unique=True)
+    github_access_token = db.Column(db.String(255))
+    github_username = db.Column(db.String(100))
+    
+    # Subscription fields
+    subscription_id = db.Column(db.String(100), unique=True)
+    subscription_status = db.Column(db.String(20), default='free')  # free, active, expired, cancelled
+    subscription_tier = db.Column(db.String(20), default='free')  # free, basic, pro, enterprise
+    subscription_expires_at = db.Column(db.DateTime)
+    last_verification = db.Column(db.DateTime)
+    
+    @property
+    def has_active_subscription(self):
+        """Check if user has an active subscription"""
+        if not self.subscription_status or self.subscription_status == 'free':
+            return False
+        if self.subscription_expires_at and self.subscription_expires_at < datetime.now():
+            return False
+        return True
+    
+    @property
+    def can_access_premium_features(self):
+        """Check if user can access premium features"""
+        return self.has_active_subscription and self.subscription_tier in ['basic', 'pro', 'enterprise']
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -125,3 +150,25 @@ class Setting(db.Model):
     
     def __repr__(self):
         return f'<Setting {self.key}>'
+
+class OdooInstallation(db.Model):
+    """Model for tracking Odoo installations"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    server_host = db.Column(db.String(255), nullable=False)
+    server_username = db.Column(db.String(255), nullable=False)
+    odoo_version = db.Column(db.String(10), nullable=False)
+    odoo_user = db.Column(db.String(255), nullable=False, default='odoo')
+    port = db.Column(db.Integer, nullable=False, default=8069)
+    install_nginx = db.Column(db.Boolean, nullable=False, default=False)
+    is_enterprise = db.Column(db.Boolean, nullable=False, default=False)
+    admin_password = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('odoo_installations', lazy=True))
+
+    def __repr__(self):
+        return f'<OdooInstallation {self.id}>'

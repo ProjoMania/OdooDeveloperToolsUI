@@ -1,0 +1,1 @@
+"""Odoo installer package for remote Odoo installations.""" 
