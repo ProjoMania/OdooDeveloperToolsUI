@@ -10,10 +10,16 @@ from src.database import db
 from models import OdooInstallation
 from src.odoo_installer.installer import OdooInstaller, OdooInstallConfig
 import threading
+import os
+import json
+from src.portal_auth import get_portal_user_status
 
 # Create a blueprint for API endpoints
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
+
+# Configure Django portal URL
+DJANGO_PORTAL_URL = os.getenv('DJANGO_PORTAL_URL', 'http://localhost:8000')
 
 # API endpoint to get the record count for a database
 @api_bp.route('/database/<db_name>/record_count', methods=['GET'])
@@ -205,121 +211,271 @@ def submit_migration_request():
             'message': f"An unexpected error occurred: {str(e)}"
         }), 500
 
-@api_bp.route('/odoo/install/', methods=['POST'])
-@login_required
-def start_odoo_installation():
-    """Start a new Odoo installation"""
+@api_bp.route('/odoo/install', methods=['POST'])
+def install_odoo():
+    """Start Odoo installation on remote server via Django portal"""
     try:
-        data = request.get_json()
+        # Check if user is authenticated through portal
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_logged_in'):
+            return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
-        # Create installation record
-        installation = OdooInstallation(
-            user_id=current_user.id,
-            server_host=data['server_host'],
-            server_username=data['server_username'],
-            odoo_version=data['odoo_version'],
-            odoo_user=data.get('odoo_user', 'odoo'),
-            port=data.get('port', 8069),
-            install_nginx=data.get('install_nginx', False),
-            is_enterprise=data.get('is_enterprise', False),
-            admin_password=data['admin_password'],
-            status='pending'
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        # Forward the installation request to Django portal
+        django_response = requests.post(
+            f'{DJANGO_PORTAL_URL}/api/odoo/install/',
+            json=data,
+            cookies=request.cookies,  # Forward cookies for session
+            timeout=30
         )
-        db.session.add(installation)
-        db.session.commit()
-
-        # Start installation in background thread
-        thread = threading.Thread(
-            target=perform_installation,
-            args=(installation.id, data)
-        )
-        thread.start()
-
-        return jsonify({
-            'message': 'Installation started',
-            'installation_id': installation.id
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-def perform_installation(installation_id, data):
-    """Perform the actual installation in a background thread"""
-    try:
-        installation = OdooInstallation.query.get(installation_id)
-        if not installation:
-            return
-
-        installation.status = 'in_progress'
-        db.session.commit()
-
-        # Create installer configuration
-        config = OdooInstallConfig(
-            version=installation.odoo_version,
-            user=installation.odoo_user,
-            port=installation.port,
-            install_nginx=installation.install_nginx,
-            is_enterprise=installation.is_enterprise,
-            admin_password=installation.admin_password
-        )
-
-        # Create installer instance
-        installer = OdooInstaller(
-            host=installation.server_host,
-            username=installation.server_username,
-            password=data.get('server_password')
-        )
-
-        # Perform installation
-        success = installer.install_odoo(config)
-
-        if success:
-            installation.status = 'completed'
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
         else:
-            installation.status = 'failed'
-            installation.error_message = 'Installation failed'
-
-    except Exception as e:
-        installation.status = 'failed'
-        installation.error_message = str(e)
-
-    finally:
-        db.session.commit()
-
-@api_bp.route('/odoo/installations/<int:installation_id>/status/')
-@login_required
-def get_installation_status(installation_id):
-    """Get the status of an installation"""
-    try:
-        installation = OdooInstallation.query.get_or_404(installation_id)
-        if installation.user_id != current_user.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
+            return jsonify({
+                'success': False, 
+                'message': f'Django portal error: {django_response.status_code}'
+            }), 500
+            
+    except requests.RequestException as e:
+        logger.error(f"Error communicating with Django portal: {str(e)}")
         return jsonify({
-            'status': installation.status,
-            'error_message': installation.error_message,
-            'created_at': installation.created_at.isoformat(),
-            'updated_at': installation.updated_at.isoformat()
-        })
-
+            'success': False, 
+            'message': 'Unable to communicate with installation service'
+        }), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in install_odoo: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@api_bp.route('/odoo/installations/')
-@login_required
-def list_installations():
-    """List all installations for the current user"""
+@api_bp.route('/odoo/install/<installation_id>/status', methods=['GET'])
+def check_installation_status(installation_id):
+    """Check the status of an Odoo installation"""
     try:
-        installations = OdooInstallation.query.filter_by(user_id=current_user.id).all()
-        data = [{
-            'id': inst.id,
-            'odoo_version': inst.odoo_version,
-            'server_host': inst.server_host,
-            'status': inst.status,
-            'created_at': inst.created_at.isoformat(),
-            'updated_at': inst.updated_at.isoformat()
-        } for inst in installations]
-        return jsonify({'installations': data})
-
+        # Check authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_logged_in'):
+            return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        # Get status from Django portal
+        django_response = requests.get(
+            f'{DJANGO_PORTAL_URL}/api/odoo/install/{installation_id}/status/',
+            cookies=request.cookies,
+            timeout=15
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'status': 'unknown',
+                'message': 'Unable to get installation status'
+            }), 500
+            
+    except requests.RequestException as e:
+        logger.error(f"Error checking installation status: {str(e)}")
+        return jsonify({
+            'status': 'unknown',
+            'message': 'Communication error'
+        }), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in check_installation_status: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@api_bp.route('/odoo/service', methods=['POST'])
+def manage_odoo_service():
+    """Manage Odoo service (start/stop/restart) - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        # Forward to Django portal
+        django_response = requests.post(
+            f'{DJANGO_PORTAL_URL}/api/odoo/service/',
+            json=data,
+            cookies=request.cookies,
+            timeout=30
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Service management error: {django_response.status_code}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in manage_odoo_service: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@api_bp.route('/odoo/service/status', methods=['GET'])
+def get_service_status():
+    """Get Odoo service status - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        host = request.args.get('host')
+        if not host:
+            return jsonify({'success': False, 'message': 'Host parameter required'}), 400
+        
+        # Get status from Django portal
+        django_response = requests.get(
+            f'{DJANGO_PORTAL_URL}/api/odoo/service/status/',
+            params={'host': host},
+            cookies=request.cookies,
+            timeout=15
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'status': 'unknown',
+                'message': 'Unable to get service status'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in get_service_status: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@api_bp.route('/odoo/git-update', methods=['POST'])
+def git_update():
+    """Pull updates from GitHub for custom addons - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        # Forward to Django portal
+        django_response = requests.post(
+            f'{DJANGO_PORTAL_URL}/api/odoo/git-update/',
+            json=data,
+            cookies=request.cookies,
+            timeout=60  # Git operations might take longer
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Git update error: {django_response.status_code}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in git_update: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@api_bp.route('/odoo/databases', methods=['GET'])
+def get_odoo_databases():
+    """Get list of Odoo databases on server - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        host = request.args.get('host')
+        if not host:
+            return jsonify({'success': False, 'message': 'Host parameter required'}), 400
+        
+        # Get databases from Django portal
+        django_response = requests.get(
+            f'{DJANGO_PORTAL_URL}/api/odoo/databases/',
+            params={'host': host},
+            cookies=request.cookies,
+            timeout=15
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'databases': [],
+                'message': 'Unable to get database list'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in get_odoo_databases: {str(e)}")
+        return jsonify({'databases': [], 'message': str(e)}), 500
+
+@api_bp.route('/odoo/module', methods=['POST'])
+def manage_odoo_module():
+    """Install/upgrade/uninstall Odoo modules - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+        # Forward to Django portal
+        django_response = requests.post(
+            f'{DJANGO_PORTAL_URL}/api/odoo/module/',
+            json=data,
+            cookies=request.cookies,
+            timeout=120  # Module operations can take time
+        )
+        
+        if django_response.status_code == 200:
+            return jsonify(django_response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Module management error: {django_response.status_code}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in manage_odoo_module: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@api_bp.route('/odoo/logs', methods=['GET'])
+def view_odoo_logs():
+    """View Odoo logs - Premium feature"""
+    try:
+        # Check premium authentication
+        portal_status = get_portal_user_status()
+        if not portal_status or not portal_status.get('is_premium'):
+            return jsonify({'success': False, 'message': 'Premium subscription required'}), 403
+        
+        host = request.args.get('host')
+        if not host:
+            return jsonify({'success': False, 'message': 'Host parameter required'}), 400
+        
+        # Get logs from Django portal
+        django_response = requests.get(
+            f'{DJANGO_PORTAL_URL}/api/odoo/logs/',
+            params={'host': host},
+            cookies=request.cookies,
+            timeout=30
+        )
+        
+        if django_response.status_code == 200:
+            # Return logs content directly
+            return django_response.content, 200, {'Content-Type': 'text/plain'}
+        else:
+            return f"Unable to retrieve logs (Status: {django_response.status_code})", 500, {'Content-Type': 'text/plain'}
+            
+    except Exception as e:
+        logger.error(f"Error in view_odoo_logs: {str(e)}")
+        return f"Error retrieving logs: {str(e)}", 500, {'Content-Type': 'text/plain'}
