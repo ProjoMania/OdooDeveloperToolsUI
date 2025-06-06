@@ -217,13 +217,13 @@ def index():
 
 @app.route('/servers')
 def ssh_servers():
-    """SSH Server management page"""
+    """Remote Server management page"""
     servers = get_ssh_servers()
     return render_template('ssh.html', servers=servers)
 
 @app.route('/servers/add', methods=['GET', 'POST'])
 def add_ssh_server():
-    """Add a new SSH server"""
+    """Add a new Remote Server"""
     if request.method == 'POST':
         # Get form data
         host = request.form.get('host').strip()
@@ -301,7 +301,7 @@ def add_ssh_server():
 
 @app.route('/servers/delete/<host>', methods=['GET', 'POST'])
 def delete_ssh_server(host):
-    """Delete an SSH server configuration"""
+    """Delete a Remote Server configuration"""
     try:
         # Build the path to the config file
         config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
@@ -338,7 +338,7 @@ def delete_ssh_server(host):
 
 @app.route('/servers/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
-    """Generate an SSH command for the client to execute"""
+    """Generate a Remote Server command for the client to execute"""
     servers = get_ssh_servers()
     
     # Find the server with matching host
@@ -394,7 +394,7 @@ def ssh_connect():
 
 @app.route('/servers/<host>/details')
 def ssh_server_details(host):
-    """SSH Server details page for managing servers and installing Odoo"""
+    """Remote Server details page for managing servers and installing Odoo"""
     servers = get_ssh_servers()
     
     # Find the specific server

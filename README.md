@@ -10,10 +10,10 @@ A desktop application to simplify Odoo development and server management tasks o
   - Consistent and intuitive interface throughout the application
   - Enhanced user experience with improved form controls and visual feedback
 
-- **SSH Server Management**
-  - Add SSH server configurations
-  - List all configured SSH servers with details
-  - Connect to SSH servers with a simple interface
+- **Remote Server Management**
+  - Add Remote server configurations
+  - List all configured Remote servers with details
+  - Connect to Remote servers with a simple interface
   - Dedicated deletion page with confirmation to prevent accidental removal
 
 - **Odoo Database Management**
@@ -26,7 +26,7 @@ A desktop application to simplify Odoo development and server management tasks o
 - **Project Management**
   - Create and manage development projects
   - Track project status and progress
-  - Link projects to SSH servers and databases
+  - Link projects to Remote servers and databases
   - Dedicated deletion page with confirmation for safe removal
 
 - **Task Management**
@@ -193,11 +193,11 @@ You can start the application:
 1. From the desktop menu (under Development or Utilities categories)
 2. By running `./main.py` from the project directory
 
-### SSH Server Management
+### Remote Server Management
 
-- **Add SSH Server**: Create a new SSH server configuration with host, IP/domain, user, port, and key file.
-- **Connect to SSH Server**: Select a server and connect to it through a terminal emulator.
-- **List SSH Servers**: View all configured SSH servers with their details.
+- **Add Remote Server**: Create a new Remote server configuration with host, IP/domain, user, port, and key file.
+- **Connect to Remote Server**: Select a server and connect to it through a terminal emulator.
+- **List Remote Servers**: View all configured Remote servers with their details.
 
 ### Odoo Database Management
 
