@@ -390,7 +390,7 @@ document.getElementById('checkStatusBtn').addEventListener('click', function() {
 
 // SSH connection
 function connectToServer(host) {
-    fetch(`/ssh/generate_command/${host}`)
+    fetch(`/servers/generate_command/${host}`)
         .then(response => response.json())
         .then(data => {
             if (data.command) {

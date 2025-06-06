@@ -215,13 +215,13 @@ def index():
 
 # === SSH Server Routes ===
 
-@app.route('/ssh')
+@app.route('/servers')
 def ssh_servers():
     """SSH Server management page"""
     servers = get_ssh_servers()
     return render_template('ssh.html', servers=servers)
 
-@app.route('/ssh/add', methods=['GET', 'POST'])
+@app.route('/servers/add', methods=['GET', 'POST'])
 def add_ssh_server():
     """Add a new SSH server"""
     if request.method == 'POST':
@@ -299,7 +299,7 @@ def add_ssh_server():
     return render_template('ssh_add.html')
 
 
-@app.route('/ssh/delete/<host>', methods=['GET', 'POST'])
+@app.route('/servers/delete/<host>', methods=['GET', 'POST'])
 def delete_ssh_server(host):
     """Delete an SSH server configuration"""
     try:
@@ -336,7 +336,7 @@ def delete_ssh_server(host):
         flash(f"Error deleting SSH server: {str(e)}", "danger")
         return redirect(url_for('ssh_servers'))
 
-@app.route('/ssh/generate_command/<host>', methods=['GET'])
+@app.route('/servers/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
     """Generate an SSH command for the client to execute"""
     servers = get_ssh_servers()
@@ -361,7 +361,7 @@ def generate_ssh_command(host):
     
     return jsonify({'error': 'Server not found'})
 
-@app.route('/ssh/connect', methods=['POST'])
+@app.route('/servers/connect', methods=['POST'])
 def ssh_connect():
     # Handle SSH connection request
     if request.method == 'POST':
@@ -392,7 +392,7 @@ def ssh_connect():
     flash('Invalid SSH connection request', 'error')
     return redirect(url_for('ssh_servers'))
 
-@app.route('/ssh/<host>/details')
+@app.route('/servers/<host>/details')
 def ssh_server_details(host):
     """SSH Server details page for managing servers and installing Odoo"""
     servers = get_ssh_servers()
