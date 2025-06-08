@@ -458,11 +458,19 @@ def connect_ssh(host):
     """Connect to SSH server using system ssh command only"""
     import subprocess
     import os
+    
     # Parse config as before
     config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
     if not os.path.exists(config_file):
         flash('Server configuration not found', 'error')
         return redirect(url_for('ssh_servers'))
+    
+    # Get SSH_AUTH_SOCK from environment or use default
+    ssh_auth_sock = os.environ.get('SSH_AUTH_SOCK', '/run/user/{}/keyring/ssh'.format(os.getuid()))
+    
+    # Set up environment for SSH command
+    env = os.environ.copy()
+    env['SSH_AUTH_SOCK'] = ssh_auth_sock
     
     # Optionally parse config for display, but not needed for connection
     ssh_config = os.path.expanduser('~/.ssh/config')
@@ -472,8 +480,17 @@ def connect_ssh(host):
         host,
         'echo "Connection successful"'
     ]
+    
     try:
-        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=10)
+        # Run SSH command with the correct environment
+        result = subprocess.run(
+            ssh_cmd,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env
+        )
+        
         if result.returncode == 0:
             flash(f'Successfully connected to {host}', 'success')
         else:
