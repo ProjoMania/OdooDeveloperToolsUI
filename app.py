@@ -18,10 +18,31 @@ import glob
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
-import markdown
+import importlib.metadata
+import importlib.util
 from models import Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting, User
 from auth import check_subscription_status, subscription_required, premium_feature_required, get_subscription_portal_url
 from src.portal_auth import get_portal_user_status, premium_required
+from flask_sock import Sock
+import threading
+import queue
+import pty
+import select
+import termios
+import tty
+import struct
+import fcntl
+import signal
+import time
+import uuid
+
+# Try to import markdown safely
+try:
+    import markdown
+    MARKDOWN_AVAILABLE = True
+except (ImportError, AttributeError):
+    MARKDOWN_AVAILABLE = False
+    logging.warning("Markdown support is not available")
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -32,14 +53,33 @@ app.config['UPLOAD_FOLDER'] = '/tmp/odoo_dev_tools_uploads'
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dev_tools.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Initialize database
 db.init_app(app)
+
+# Create database tables
+with app.app_context():
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Error creating database tables: {str(e)}")
+        raise
 
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Initialize Flask-Sock
+sock = Sock(app)
+
+# Store active SSH sessions
+active_sessions = {}
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -90,7 +130,7 @@ def get_db_connection():
             # Get settings with defaults if not set
             user = get_setting('postgres_user', 'postgres')
             password = get_setting('postgres_password', '')
-            host = get_setting('postgres_host', 'localhost')
+            host = get_setting('postgres_host', '127.0.0.1')
             port = get_setting('postgres_port', '5432')
 
         logger.info(f"Attempting to connect to PostgreSQL at {host}:{port} as user {user}")
@@ -206,6 +246,60 @@ def update_main_ssh_config():
     with open(ssh_config_file, 'a') as f:
         f.write(f"\n{include_line}\n")
 
+def get_ssh_config(host):
+    """Get SSH configuration for a host"""
+    config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+    if not os.path.exists(config_file):
+        return None
+        
+    config = {}
+    with open(config_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, value = line.split(' ', 1)
+                config[key] = value.strip()
+    return config
+
+def create_ssh_client(host):
+    """Create and configure SSH client"""
+    config = get_ssh_config(host)
+    if not config:
+        return None
+        
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Get connection parameters
+        hostname = config.get('HostName', host)
+        username = config.get('User', os.getenv('USER'))
+        port = int(config.get('Port', 22))
+        
+        # Connect using key or password
+        if 'IdentityFile' in config:
+            key_path = os.path.expanduser(config['IdentityFile'])
+            client.connect(
+                hostname=hostname,
+                username=username,
+                key_filename=key_path,
+                port=port
+            )
+        else:
+            # Try to get password from config or environment
+            password = os.getenv('SSH_PASSWORD', '')
+            client.connect(
+                hostname=hostname,
+                username=username,
+                password=password,
+                port=port
+            )
+            
+        return client
+    except Exception as e:
+        print(f"SSH connection error: {str(e)}")
+        return None
+
 # === Routes ===
 
 @app.route('/')
@@ -214,16 +308,15 @@ def index():
     return render_template('index.html')
 
 # === SSH Server Routes ===
-
-@app.route('/ssh')
+@app.route('/servers')
 def ssh_servers():
-    """SSH Server management page"""
+    """Remote Server management page"""
     servers = get_ssh_servers()
     return render_template('ssh.html', servers=servers)
 
-@app.route('/ssh/add', methods=['GET', 'POST'])
+@app.route('/servers/add', methods=['GET', 'POST'])
 def add_ssh_server():
-    """Add a new SSH server"""
+    """Add a new Remote Server"""
     if request.method == 'POST':
         # Get form data
         host = request.form.get('host').strip()
@@ -298,10 +391,9 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
-
-@app.route('/ssh/delete/<host>', methods=['GET', 'POST'])
+@app.route('/servers/delete/<host>', methods=['GET', 'POST'])
 def delete_ssh_server(host):
-    """Delete an SSH server configuration"""
+    """Delete a Remote Server configuration"""
     try:
         # Build the path to the config file
         config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
@@ -336,9 +428,9 @@ def delete_ssh_server(host):
         flash(f"Error deleting SSH server: {str(e)}", "danger")
         return redirect(url_for('ssh_servers'))
 
-@app.route('/ssh/generate_command/<host>', methods=['GET'])
+@app.route('/servers/generate_command/<host>', methods=['GET'])
 def generate_ssh_command(host):
-    """Generate an SSH command for the client to execute"""
+    """Generate a Remote Server command for the client to execute"""
     servers = get_ssh_servers()
     
     # Find the server with matching host
@@ -361,47 +453,187 @@ def generate_ssh_command(host):
     
     return jsonify({'error': 'Server not found'})
 
-@app.route('/ssh/connect', methods=['POST'])
-def ssh_connect():
-    # Handle SSH connection request
-    if request.method == 'POST':
-        command = request.form.get('command')
-        server_host = request.form.get('server_host', '')
-        auth_type = request.form.get('auth_type', 'key')
-        user = request.form.get('user', '')
-        hostname = request.form.get('hostname', '')
+@app.route('/servers/connect/<host>', methods=['GET', 'POST'])
+def connect_ssh(host):
+    """Connect to SSH server"""
+    try:
+        # Get server configuration from SSH config
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+        if not os.path.exists(config_file):
+            flash('Server configuration not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+        # Parse SSH config
+        hostname = None
+        user = None
+        port = 22
+        auth_method = 'key'
+        key_file = None
+        password = None
         
-        if command:
-            try:
-                # Prepare server information for the template
-                server_info = {
-                    'host': server_host,
-                    'auth_type': auth_type,
-                    'user': user,
-                    'hostname': hostname
-                }
+        with open(config_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('HostName'):
+                    hostname = line.split(' ', 1)[1].strip()
+                elif line.startswith('User'):
+                    user = line.split(' ', 1)[1].strip()
+                elif line.startswith('Port'):
+                    port = int(line.split(' ', 1)[1].strip())
+                elif line.startswith('IdentityFile'):
+                    key_file = line.split(' ', 1)[1].strip()
+                    auth_method = 'key'
+                elif line.startswith('PreferredAuthentications'):
+                    if 'password' in line.lower():
+                        auth_method = 'password'
+                elif line.startswith('# Password:'):
+                    password = line.split(':', 1)[1].strip()
+        
+        if not hostname:
+            flash('Invalid server configuration: HostName not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+        if not user:
+            flash('Invalid server configuration: User not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+        # Create SSH client
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect to server
+        try:
+            print(f"Connecting to {hostname} as {user} using {auth_method} authentication")  # Debug log
+            
+            if auth_method == 'password':
+                if not password:
+                    flash('Password authentication selected but no password found in config', 'error')
+                    return redirect(url_for('ssh_servers'))
+                    
+                print("Attempting password authentication")  # Debug log
+                client.connect(
+                    hostname=hostname,
+                    port=port,
+                    username=user,
+                    password=password,
+                    look_for_keys=False,  # Don't look for keys when using password auth
+                    allow_agent=False     # Don't use SSH agent when using password auth
+                )
+            else:  # key-based auth
+                if not key_file:
+                    flash('Key authentication selected but no key file found in config', 'error')
+                    return redirect(url_for('ssh_servers'))
+                    
+                print(f"Attempting key authentication with key file: {key_file}")  # Debug log
                 
-                # Redirect to a terminal command using the SSH command
-                # This could be customized based on your environment and terminal preferences
-                return render_template('ssh_connect.html', command=command, server_info=server_info)
-            except Exception as e:
-                flash(f'Error connecting to SSH: {str(e)}', 'error')
-                return redirect(url_for('ssh_servers'))
-    
-    # If we get here, something went wrong
-    flash('Invalid SSH connection request', 'error')
-    return redirect(url_for('ssh_servers'))
+                # Try to load the key file
+                try:
+                    # First try loading as OpenSSH key
+                    key = paramiko.RSAKey.from_private_key_file(key_file)
+                except Exception as e:
+                    print(f"Failed to load key as OpenSSH format: {str(e)}")  # Debug log
+                    try:
+                        # Try loading as RSA key
+                        key = paramiko.RSAKey.from_private_key_file(key_file, password=None)
+                    except Exception as e:
+                        print(f"Failed to load key as RSA format: {str(e)}")  # Debug log
+                        flash('Failed to load SSH key. Please check the key file format.', 'error')
+                        return redirect(url_for('ssh_servers'))
+                
+                # Connect using the loaded key
+                try:
+                    client.connect(
+                        hostname=hostname,
+                        port=port,
+                        username=user,
+                        pkey=key,
+                        look_for_keys=False,  # Only use the specified key file
+                        allow_agent=False,    # Don't use SSH agent
+                        timeout=10            # Add timeout
+                    )
+                except paramiko.AuthenticationException as e:
+                    print(f"Authentication failed with key: {str(e)}")  # Debug log
+                    # Try connecting with system SSH agent as fallback
+                    try:
+                        print("Trying to connect using system SSH agent...")  # Debug log
+                        client.connect(
+                            hostname=hostname,
+                            port=port,
+                            username=user,
+                            look_for_keys=True,  # Look for keys in default locations
+                            allow_agent=True,    # Use SSH agent
+                            timeout=10
+                        )
+                    except Exception as e:
+                        print(f"Failed to connect using SSH agent: {str(e)}")  # Debug log
+                        # Try using system SSH command as last resort
+                        try:
+                            print("Trying to connect using system SSH command...")  # Debug log
+                            # Create a temporary script to test SSH connection
+                            script_path = os.path.join(tempfile.gettempdir(), f"ssh_test_{host}.sh")
+                            with open(script_path, 'w') as f:
+                                f.write(f"""#!/bin/bash
+ssh -F ~/.ssh/config {host} 'echo "Connection successful"'
+""")
+                            os.chmod(script_path, 0o755)
+                            
+                            # Run the script
+                            result = subprocess.run([script_path], capture_output=True, text=True)
+                            if result.returncode == 0:
+                                # If SSH command works, create a new SSH client
+                                client = paramiko.SSHClient()
+                                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                                client.connect(
+                                    hostname=hostname,
+                                    port=port,
+                                    username=user,
+                                    look_for_keys=True,
+                                    allow_agent=True,
+                                    timeout=10
+                                )
+                            else:
+                                print(f"SSH command failed: {result.stderr}")  # Debug log
+                                raise Exception("SSH command failed")
+                        except Exception as e:
+                            print(f"Failed to connect using SSH command: {str(e)}")  # Debug log
+                            raise
+                
+            # Create session
+            session_id = str(uuid.uuid4())
+            active_sessions[session_id] = {
+                'client': client,
+                'host': host,
+                'start_time': datetime.now()
+            }
+            
+            flash(f'Successfully connected to {host}', 'success')
+            return redirect(url_for('ssh_terminal_page', host=host))
+            
+        except paramiko.AuthenticationException as e:
+            print(f"Authentication failed: {str(e)}")  # Debug log
+            flash('Authentication failed. Please check your credentials.', 'error')
+            return redirect(url_for('ssh_servers'))
+        except paramiko.SSHException as e:
+            print(f"SSH error: {str(e)}")  # Debug log
+            flash(f'SSH error: {str(e)}', 'error')
+            return redirect(url_for('ssh_servers'))
+        except Exception as e:
+            print(f"Connection error: {str(e)}")  # Debug log
+            flash(f'Error connecting to SSH: {str(e)}', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+    except Exception as e:
+        print(f"General error: {str(e)}")  # Debug log
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('ssh_servers'))
 
-@app.route('/ssh/<host>/details')
+@app.route('/servers/<host>/details')
+@premium_required
 def ssh_server_details(host):
-    """SSH Server details page for managing servers and installing Odoo - Premium only"""
+    """Remote Server details page for managing servers and installing Odoo"""
+    # Get portal user status for premium check
     portal_status = get_portal_user_status()
     is_premium = portal_status and portal_status.get('is_premium', False)
-    
-    # Check if user has premium access
-    if not is_premium:
-        flash('Premium subscription required to access server details and management features.', 'warning')
-        return redirect(url_for('ssh_servers'))
     
     servers = get_ssh_servers()
     
@@ -417,6 +649,88 @@ def ssh_server_details(host):
         return redirect(url_for('ssh_servers'))
     
     return render_template('ssh_server_details.html', server=server, is_premium=is_premium)
+
+@app.route('/servers/<host>/edit', methods=['GET', 'POST'])
+@login_required
+@premium_required
+def edit_ssh_server(host):
+    """Edit an existing SSH server configuration"""
+    # Get portal user status for premium check
+    portal_status = get_portal_user_status()
+    is_premium = portal_status and portal_status.get('is_premium', False)
+    
+    if not is_premium:
+        flash('This feature requires a premium subscription', 'warning')
+        return redirect(url_for('settings'))
+    
+    # Get all servers
+    servers = get_ssh_servers()
+    
+    # Find the specific server
+    server = None
+    for s in servers:
+        if s['host'] == host:
+            server = s
+            break
+    
+    if not server:
+        flash(f'SSH server "{host}" not found', 'danger')
+        return redirect(url_for('ssh_servers'))
+    
+    if request.method == 'POST':
+        # Get form data
+        new_host = request.form.get('host').strip()
+        hostname = request.form.get('hostname').strip()
+        user = request.form.get('user').strip()
+        port = request.form.get('port').strip() or "22"
+        auth_method = request.form.get('auth_method', 'key')
+        key_file = request.form.get('key_file', '').strip() if auth_method == 'key' else ''
+        password = request.form.get('password', '').strip() if auth_method == 'password' else ''
+        
+        # Validate inputs
+        if not new_host or not hostname:
+            flash('Host and IP/Domain are required fields', 'danger')
+            return render_template('ssh_edit.html', server=server)
+        
+        # Create config file
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+        new_config_file = os.path.join(SSH_CONFIG_DIR, f"{new_host}.conf")
+        
+        # Check if new hostname already exists (if changed)
+        if new_host != host and os.path.exists(new_config_file):
+            flash(f'SSH configuration for {new_host} already exists', 'danger')
+            return render_template('ssh_edit.html', server=server)
+        
+        # Write the configuration file
+        with open(config_file, 'w') as f:
+            f.write(f"Host {new_host}\n")
+            f.write(f"    HostName {hostname}\n")
+            if user:
+                f.write(f"    User {user}\n")
+            f.write(f"    Port {port}\n")
+            
+            # Authentication settings
+            if auth_method == 'key' and key_file:
+                f.write(f"    IdentityFile {key_file}\n")
+                f.write(f"    PreferredAuthentications publickey\n")
+            elif auth_method == 'password' and password:
+                f.write(f"    PreferredAuthentications password\n")
+                f.write(f"    PasswordAuthentication yes\n")
+                # Store password in a safer way in a real-world application
+                # For this demo, we'll add it as a comment (NOT recommended for production)
+                f.write(f"    # Password: {password}\n")
+        
+        # Rename config file if hostname changed
+        if new_host != host:
+            os.rename(config_file, new_config_file)
+        
+        # Update main SSH config if needed
+        update_main_ssh_config()
+        
+        flash(f'SSH server "{new_host}" updated successfully', 'success')
+        return redirect(url_for('ssh_server_details', host=new_host))
+    
+    return render_template('ssh_edit.html', server=server)
 
 # === Database Routes ===
 
@@ -464,7 +778,7 @@ def list_databases():
                     dbname=db_name,
                     user=get_setting('postgres_user', 'postgres'),
                     password=get_setting('postgres_password', ''),
-                    host=get_setting('postgres_host', 'localhost'),
+                    host=get_setting('postgres_host', '127.0.0.1'),
                     port=get_setting('postgres_port', '5432')
                 )
                 db_cursor = db_conn.cursor()
@@ -767,7 +1081,7 @@ def extend_enterprise(db_name=None):
     try:
         # Get PostgreSQL connection settings directly to show in debug log
         postgres_user = get_setting('postgres_user', 'postgres')
-        postgres_host = get_setting('postgres_host', 'localhost')
+        postgres_host = get_setting('postgres_host', '127.0.0.1')
         postgres_port = get_setting('postgres_port', '5432')
                 
         conn = get_db_connection()
@@ -794,7 +1108,7 @@ def extend_enterprise(db_name=None):
             # Use complete connection settings from the database
             postgres_user = get_setting('postgres_user', 'postgres')
             postgres_password = get_setting('postgres_password', '')
-            postgres_host = get_setting('postgres_host', 'localhost')
+            postgres_host = get_setting('postgres_host', '127.0.0.1')
             postgres_port = get_setting('postgres_port', '5432')
             
             # Connect with appropriate parameters based on whether password is set
@@ -876,14 +1190,14 @@ def extend_enterprise(db_name=None):
                         dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         password=get_setting('postgres_password', ''),
-                        host=get_setting('postgres_host', 'localhost'),
+                        host=get_setting('postgres_host', '127.0.0.1'),
                         port=get_setting('postgres_port', '5432')
                     )
                 else:
                     db_conn = psycopg2.connect(
                         dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
-                        host=get_setting('postgres_host', 'localhost'),
+                        host=get_setting('postgres_host', '127.0.0.1'),
                         port=get_setting('postgres_port', '5432')
                     )
                 db_conn.autocommit = True
@@ -1422,7 +1736,7 @@ def settings():
             # PostgreSQL settings
             ('postgres_user', request.form.get('postgres_user', 'postgres')),
             ('postgres_password', request.form.get('postgres_password', '')),
-            ('postgres_host', request.form.get('postgres_host', 'localhost')),
+            ('postgres_host', request.form.get('postgres_host', '127.0.0.1')),
             ('postgres_port', request.form.get('postgres_port', '5432')),
             
             # File paths
@@ -1519,6 +1833,101 @@ def logout():
     portal_url = get_subscription_portal_url()
     return redirect(f"{portal_url}/logout")
 
+@sock.route('/ws/ssh/<host>')
+def ssh_terminal(ws, host):
+    """WebSocket endpoint for SSH terminal"""
+    try:
+        # Get server details
+        server = SSHServer.query.filter_by(host=host).first()
+        if not server:
+            ws.send(json.dumps({'type': 'error', 'message': 'Server not found'}))
+            return
+
+        # Create SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect to server
+        ssh.connect(
+            hostname=server.host,
+            port=server.port,
+            username=server.username,
+            password=server.password if server.auth_type == 'password' else None,
+            key_filename=server.key_path if server.auth_type == 'key' else None
+        )
+        
+        # Create interactive shell
+        channel = ssh.invoke_shell()
+        channel.settimeout(0.1)
+        
+        # Store session
+        session_id = f"{host}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        active_sessions[session_id] = {
+            'ssh': ssh,
+            'channel': channel,
+            'last_activity': datetime.now()
+        }
+        
+        # Send initial connection success
+        ws.send(json.dumps({
+            'type': 'connected',
+            'message': f'Connected to {server.host}'
+        }))
+        
+        # Main terminal loop
+        while True:
+            try:
+                # Check for incoming WebSocket messages
+                message = ws.receive()
+                if message:
+                    data = json.loads(message)
+                    if data['type'] == 'input':
+                        channel.send(data['data'])
+                    elif data['type'] == 'resize':
+                        channel.get_pty(term='xterm', width=data['cols'], height=data['rows'])
+                
+                # Check for incoming SSH data
+                if channel.recv_ready():
+                    data = channel.recv(4096).decode('utf-8', errors='ignore')
+                    ws.send(json.dumps({
+                        'type': 'output',
+                        'data': data
+                    }))
+                
+                # Check for errors
+                if channel.recv_stderr_ready():
+                    error = channel.recv_stderr(4096).decode('utf-8', errors='ignore')
+                    ws.send(json.dumps({
+                        'type': 'error',
+                        'data': error
+                    }))
+                
+                # Check if channel is closed
+                if channel.exit_status_ready():
+                    break
+                    
+            except Exception as e:
+                ws.send(json.dumps({
+                    'type': 'error',
+                    'message': str(e)
+                }))
+                break
+                
+    except Exception as e:
+        ws.send(json.dumps({
+            'type': 'error',
+            'message': str(e)
+        }))
+    finally:
+        # Clean up
+        if 'session_id' in locals():
+            if session_id in active_sessions:
+                session = active_sessions[session_id]
+                session['channel'].close()
+                session['ssh'].close()
+                del active_sessions[session_id]
+
+
 # === Run the Application ===
 if __name__ == '__main__':
     import argparse
@@ -1539,7 +1948,7 @@ if __name__ == '__main__':
                 # PostgreSQL settings
                 ('postgres_user', 'postgres', 'Default PostgreSQL username'),
                 ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
-                ('postgres_host', 'localhost', 'PostgreSQL server hostname'),
+                ('postgres_host', '127.0.0.1', 'PostgreSQL server hostname'),
                 ('postgres_port', '5432', 'PostgreSQL server port'),
                 
                 # File paths

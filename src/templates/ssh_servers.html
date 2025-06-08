@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-server me-2"></i>
+                        SSH Servers
+                    </h4>
+                    <a href="{{ url_for('add_ssh_server') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add Server
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if servers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Host</th>
+                                        <th>Port</th>
+                                        <th>Username</th>
+                                        <th>Auth Type</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for server in servers %}
+                                    <tr>
+                                        <td>{{ server.host }}</td>
+                                        <td>{{ server.port }}</td>
+                                        <td>{{ server.user }}</td>
+                                        <td>
+                                            {% if server.key_file %}
+                                                <span class="badge bg-warning">SSH Key</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Password</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ server.description or '' }}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <a href="{{ url_for('connect_ssh', host=server.host) }}" 
+                                                   class="btn btn-sm btn-success">
+                                                    <i class="fas fa-terminal me-1"></i>Connect
+                                                </a>
+                                                <a href="{{ url_for('delete_ssh_server', host=server.host) }}" 
+                                                   class="btn btn-sm btn-danger"
+                                                   onclick="return confirm('Are you sure you want to delete this server?')">
+                                                    <i class="fas fa-trash me-1"></i>Delete
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                            <h5>No SSH Servers</h5>
+                            <p class="text-muted">Add your first SSH server to get started</p>
+                            <a href="{{ url_for('add_ssh_server') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Add Server
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function connectToServer(host) {
+    window.location.href = `/servers/connect/${host}`;
+}
+</script>
+{% endblock %} 

@@ -10,10 +10,10 @@ A desktop application to simplify Odoo development and server management tasks o
   - Consistent and intuitive interface throughout the application
   - Enhanced user experience with improved form controls and visual feedback
 
-- **SSH Server Management**
-  - Add SSH server configurations
-  - List all configured SSH servers with details
-  - Connect to SSH servers with a simple interface
+- **Remote Server Management**
+  - Add Remote server configurations
+  - List all configured Remote servers with details
+  - Connect to Remote servers with a simple interface
   - Dedicated deletion page with confirmation to prevent accidental removal
 
 - **Odoo Database Management**
@@ -26,7 +26,7 @@ A desktop application to simplify Odoo development and server management tasks o
 - **Project Management**
   - Create and manage development projects
   - Track project status and progress
-  - Link projects to SSH servers and databases
+  - Link projects to Remote servers and databases
   - Dedicated deletion page with confirmation for safe removal
 
 - **Task Management**
@@ -62,160 +62,85 @@ A desktop application to simplify Odoo development and server management tasks o
 
 ## Installation
 
-### Prerequisites
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/OdooDevTools.git
+cd OdooDevTools
+```
 
-- Python 3.6+
-- PostgreSQL client
-- SSH client
-- PyQt5
-- psycopg2
-
-### Automatic Installation
-
-The easiest way to install is to use the provided installation script:
-
+2. Run the installation script:
 ```bash
 ./install.sh
 ```
 
-This script will:
-1. Check for required dependencies
-2. Install required Python packages
-3. Create necessary directories
-4. Create a desktop shortcut
+The installation script will:
+- Install all required dependencies
+- Set up SSH configuration
+- Create a systemd service for auto-start
+- Create a desktop shortcut
+- Create an update script
 
-### Manual Installation
+## Updating
 
-If you prefer to install manually:
+To update the application to the latest version:
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Make the main.py executable:
-   ```bash
-   chmod +x main.py
-   ```
-
-3. Create a desktop shortcut:
-   ```bash
-   mkdir -p ~/.local/share/applications
-   echo "[Desktop Entry]
-   Name=Odoo Developer Tools
-   Comment=Tools for Odoo development and server management
-   Exec=$(pwd)/main.py
-   Icon=utilities-terminal
-   Terminal=false
-   Type=Application
-   Categories=Development;Utility;" > ~/.local/share/applications/odoo-dev-tools.desktop
-   ```
-
-### Install as a System Service (Autostart on Boot)
-
-To make the application start automatically at system boot, you can set it up as a systemd service:
-
-1. Create a systemd service file:
-   ```bash
-   sudo nano /etc/systemd/system/odoo-developer-tools.service
-   ```
-
-2. Add the following content (adjust paths as needed):
-   ```
-   [Unit]
-   Description=Odoo Developer Tools UI
-   After=network.target postgresql.service
-
-   [Service]
-   Type=simple
-   User=YOUR_USERNAME
-   WorkingDirectory=/path/to/OdooDeveloperToolsUI
-   ExecStart=/usr/bin/python3 /path/to/OdooDeveloperToolsUI/app.py
-   Restart=on-failure
-   RestartSec=5
-   StandardOutput=syslog
-   StandardError=syslog
-   SyslogIdentifier=odoo-dev-tools
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. Enable and start the service:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable odoo-developer-tools.service
-   sudo systemctl start odoo-developer-tools.service
-   ```
-
-4. Check service status:
-   ```bash
-   sudo systemctl status odoo-developer-tools.service
-   ```
-
-> **Note:** The service runs the Flask application in the background. You can access it by opening a web browser and navigating to `http://localhost:5000`
-
-### Updating the Application
-
-To update to the latest version while preserving your data, use the provided update script:
-
+1. Navigate to the cloned repository
+2. Run the update script:
 ```bash
 ./update.sh
 ```
 
 The update script will:
-1. Detect whether you're using a standard or system-wide (`/opt`) installation
-2. Create a backup of your current installation
-3. Clone the latest code from the repository
-4. Update all application files while preserving your instance data
-5. Restart the service if it was running
+- Pull the latest changes from git
+- Update Python packages
+- Restart the service
 
-### Uninstalling the Application
+## Service Management
 
-If you need to remove the application, use the uninstallation script for a clean removal:
+The application runs as a systemd service. You can control it using:
 
 ```bash
-./uninstall.sh
+# Start the service
+sudo systemctl start odoo-developer-tools.service
+
+# Stop the service
+sudo systemctl stop odoo-developer-tools.service
+
+# Restart the service
+sudo systemctl restart odoo-developer-tools.service
+
+# Check service status
+sudo systemctl status odoo-developer-tools.service
+
+# View service logs
+sudo journalctl -u odoo-developer-tools.service
 ```
 
-The uninstall script will:
-1. Stop and remove the systemd service if it was installed
-2. Offer to back up your instance data (configurations, databases) 
-3. Remove all application files and desktop shortcuts
-4. Provide a clean uninstallation with proper cleanup
+## Accessing the Application
 
-## Usage
+After installation, you can access the application at:
+- Web Interface: http://127.0.0.1:5000
+- Desktop Application: Search for "Odoo Developer Tools" in your applications menu
 
-### Starting the Application
+## Troubleshooting
 
-You can start the application:
+If you encounter SSH connection issues:
+1. Run the SSH fix script:
+```bash
+./fix_ssh.sh
+```
 
-1. From the desktop menu (under Development or Utilities categories)
-2. By running `./main.py` from the project directory
+2. Check the service logs:
+```bash
+sudo journalctl -u odoo-developer-tools.service
+```
 
-### SSH Server Management
+## Development
 
-- **Add SSH Server**: Create a new SSH server configuration with host, IP/domain, user, port, and key file.
-- **Connect to SSH Server**: Select a server and connect to it through a terminal emulator.
-- **List SSH Servers**: View all configured SSH servers with their details.
-
-### Odoo Database Management
-
-- **List Databases**: View all local Odoo databases with sizes and versions.
-- **Drop Database**: Delete a database and its filestore.
-- **Restore Database**: Restore a database from a backup zip file with options to:
-  - Deactivate cron jobs
-  - Deactivate mail servers
-  - Reset admin credentials
-- **Extend Enterprise License**: Extend Odoo Enterprise license expiration dates by 20 days.
-
-## Requirements
-
-- A Linux distribution (Ubuntu, Debian, Fedora, CentOS, etc.)
-- Python 3.6 or higher
-- PostgreSQL client
-- SSH client
-- Terminal emulator (gnome-terminal, konsole, etc.)
+The application is installed as a symlink from `/opt/odoo-developer-tools` to your cloned repository. This allows you to:
+- Keep the repository for updates
+- Make local changes for testing
+- Pull updates from the remote repository
 
 ## License
 

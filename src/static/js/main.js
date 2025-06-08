@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const host = this.getAttribute('data-host');
             
-            fetch(`/ssh/generate_command/${host}`)
+            fetch(`/servers/generate_command/${host}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.command) {
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
             button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Connecting...';
             button.disabled = true;
             
-            fetch(`/ssh/generate_command/${host}`)
+            fetch(`/servers/generate_command/${host}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.command) {
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Create a form to submit the command as POST
                         const form = document.createElement('form');
                         form.method = 'post';
-                        form.action = '/ssh/connect';
+                        form.action = `/servers/connect/${host}`;
                         form.style.display = 'none';
                         
                         // Add the command

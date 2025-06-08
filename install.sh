@@ -77,12 +77,19 @@ setup_systemd_service() {
     INSTALL_DIR="/opt/odoo-developer-tools"
     echo -e "${YELLOW}Installing to $INSTALL_DIR...${NC}"
     
-    # Create the directory and copy files
+    # Create the directory if it doesn't exist
     sudo mkdir -p "$INSTALL_DIR"
-    sudo cp -r "$SCRIPT_DIR/"* "$INSTALL_DIR/"
+    
+    # Remove existing symlink if it exists
+    if [ -L "$INSTALL_DIR" ]; then
+        sudo rm "$INSTALL_DIR"
+    fi
+    
+    # Create symlink from install directory to the repository
+    sudo ln -s "$SCRIPT_DIR" "$INSTALL_DIR"
     sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
     sudo chmod -R 755 "$INSTALL_DIR"
-    echo -e "${GREEN}Files copied to $INSTALL_DIR${NC}"
+    echo -e "${GREEN}Created symlink from $INSTALL_DIR to $SCRIPT_DIR${NC}"
     
     # Update application path
     APP_DIR="$INSTALL_DIR"
@@ -142,12 +149,77 @@ EOF
         echo -e "${GREEN}Service has been started successfully.${NC}"
         echo -e "${GREEN}The application will now start automatically on system boot.${NC}"
         echo -e "${GREEN}Application has been installed to: $APP_DIR${NC}"
-        echo -e "${YELLOW}Access the application at: http://localhost:5000${NC}"
+        echo -e "${YELLOW}Access the application at: http://127.0.0.1:5000${NC}"
         return 0
     else
         echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
         return 1
     fi
+}
+
+# Function to setup SSH
+setup_ssh() {
+    echo -e "${BLUE}Setting up SSH configuration...${NC}"
+    
+    # Create SSH directory if it doesn't exist
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    
+    # Create SSH config directory if it doesn't exist
+    mkdir -p ~/.ssh/config.d
+    chmod 700 ~/.ssh/config.d
+    
+    # Create or update SSH config
+    SSH_CONFIG="$HOME/.ssh/config"
+    if [ ! -f "$SSH_CONFIG" ]; then
+        touch "$SSH_CONFIG"
+        chmod 600 "$SSH_CONFIG"
+        echo -e "${GREEN}Created SSH config file.${NC}"
+    fi
+    
+    # Add Include directive if not present
+    if ! grep -q "^Include ~/.ssh/config.d/\*" "$SSH_CONFIG"; then
+        echo -e "\n# Include all config files from config.d directory\nInclude ~/.ssh/config.d/*" >> "$SSH_CONFIG"
+        echo -e "${GREEN}Added Include directive to SSH config.${NC}"
+    fi
+    
+    # Check if SSH agent is running
+    if ! pgrep -x "ssh-agent" > /dev/null; then
+        echo -e "${YELLOW}Starting SSH agent...${NC}"
+        eval "$(ssh-agent -s)"
+    fi
+    
+    # Add SSH key to agent if it exists
+    if [ -f ~/.ssh/id_rsa ]; then
+        echo -e "${YELLOW}Adding SSH key to agent...${NC}"
+        ssh-add ~/.ssh/id_rsa 2>/dev/null
+        echo -e "${GREEN}SSH key added to agent.${NC}"
+    else
+        echo -e "${YELLOW}No SSH key found. Would you like to generate one? (y/n)${NC}"
+        read -r generate_key
+        if [[ $generate_key =~ ^[Yy]$ ]]; then
+            ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+            ssh-add ~/.ssh/id_rsa
+            echo -e "${GREEN}SSH key generated and added to agent.${NC}"
+        fi
+    fi
+    
+    # Add SSH agent configuration to shell startup
+    SHELL_RC=""
+    if [ -f ~/.bashrc ]; then
+        SHELL_RC=~/.bashrc
+    elif [ -f ~/.zshrc ]; then
+        SHELL_RC=~/.zshrc
+    fi
+    
+    if [ -n "$SHELL_RC" ]; then
+        if ! grep -q "ssh-agent" "$SHELL_RC"; then
+            echo -e "\n# Start SSH agent if not running\nif ! pgrep -x \"ssh-agent\" > /dev/null; then\n    eval \"\$(ssh-agent -s)\"\n    ssh-add ~/.ssh/id_rsa 2>/dev/null\nfi" >> "$SHELL_RC"
+            echo -e "${GREEN}Added SSH agent configuration to $SHELL_RC${NC}"
+        fi
+    fi
+    
+    echo -e "${GREEN}SSH setup completed.${NC}"
 }
 
 # Install dependencies based on distribution
@@ -200,10 +272,18 @@ echo
 echo -e "${BLUE}Installing system dependencies...${NC}"
 install_dependencies
 
+# Setup SSH
+echo
+setup_ssh
+
 # Install Python packages
 echo
 echo -e "${BLUE}Installing Python packages...${NC}"
 pip3 install -r "$SCRIPT_DIR/requirements.txt"
+
+# Ensure correct cryptography version is installed
+echo -e "${BLUE}Ensuring correct cryptography version...${NC}"
+pip3 install cryptography==39.0.2 --force-reinstall
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Failed to install Python packages. Please check the error message above.${NC}"
@@ -238,32 +318,79 @@ echo -e "${BLUE}Creating necessary directories...${NC}"
 mkdir -p ~/.ssh/config.d
 mkdir -p ~/.local/share/Odoo/filestore
 
-# Update the SSH config
-echo -e "${BLUE}Updating SSH configuration...${NC}"
-SSH_CONFIG="$HOME/.ssh/config"
-
-# Create the SSH config file if it doesn't exist
-if [ ! -f "$SSH_CONFIG" ]; then
-    mkdir -p "$HOME/.ssh"
-    touch "$SSH_CONFIG"
-    chmod 600 "$SSH_CONFIG"
-    echo -e "${GREEN}Created SSH config file.${NC}"
-fi
-
-# Check if the Include line is already in the config
-if ! grep -q "Include $HOME/.ssh/config.d/\*.conf" "$SSH_CONFIG"; then
-    echo -e "\nInclude $HOME/.ssh/config.d/*.conf" >> "$SSH_CONFIG"
-    echo -e "${GREEN}Updated SSH config to include config.d directory.${NC}"
-else
-    echo -e "${GREEN}SSH config already includes config.d directory.${NC}"
-fi
-
 # Set up the service automatically
 echo
 echo -e "${BLUE}Setting up the application as a system service...${NC}"
 # Install as a service
 setup_systemd_service
 SERVICE_RESULT=$?
+
+# Function to create update script
+create_update_script() {
+    echo -e "${BLUE}Creating update script...${NC}"
+    
+    UPDATE_SCRIPT="$SCRIPT_DIR/update.sh"
+    cat > "$UPDATE_SCRIPT" << 'EOF'
+#!/bin/bash
+
+# === Colors ===
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}==================================================${NC}"
+echo -e "${BLUE}      Odoo Developer Tools UI Updater             ${NC}"
+echo -e "${BLUE}==================================================${NC}"
+echo
+
+# Get the current directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Stop the service
+echo -e "${YELLOW}Stopping the service...${NC}"
+sudo systemctl stop odoo-developer-tools.service
+
+# Pull latest changes
+echo -e "${YELLOW}Pulling latest changes...${NC}"
+git pull
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to pull latest changes.${NC}"
+    exit 1
+fi
+
+# Install/update Python packages
+echo -e "${YELLOW}Updating Python packages...${NC}"
+pip3 install -r "$SCRIPT_DIR/requirements.txt"
+
+# Ensure correct cryptography version is installed
+echo -e "${BLUE}Ensuring correct cryptography version...${NC}"
+pip3 install cryptography==39.0.2 --force-reinstall
+
+# Restart the service
+echo -e "${YELLOW}Restarting the service...${NC}"
+sudo systemctl daemon-reload
+sudo systemctl start odoo-developer-tools.service
+
+# Check if service started successfully
+if sudo systemctl is-active --quiet odoo-developer-tools.service; then
+    echo -e "${GREEN}Update completed successfully!${NC}"
+    echo -e "${GREEN}The application has been updated and restarted.${NC}"
+    echo -e "${YELLOW}Access the application at: http://127.0.0.1:5000${NC}"
+else
+    echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
+    exit 1
+fi
+EOF
+
+    chmod +x "$UPDATE_SCRIPT"
+    echo -e "${GREEN}Update script created at: $UPDATE_SCRIPT${NC}"
+}
+
+# Create update script
+create_update_script
 
 # All done
 echo
@@ -274,9 +401,10 @@ echo
 
 if [ $SERVICE_RESULT -eq 0 ]; then
     echo -e "You can access the Odoo Developer Tools UI:"
-    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://localhost:5000${NC}"
+    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://127.0.0.1:5000${NC}"
     echo -e "  2. The service will start automatically when your system boots"
     echo -e "  3. To control the service: ${YELLOW}sudo systemctl [start|stop|restart|status] odoo-developer-tools.service${NC}"
+    echo -e "  4. To update the application: ${YELLOW}./update.sh${NC}"
 else
     echo -e "Service setup failed. You can still run the Odoo Developer Tools UI:"
     echo -e "  1. From your desktop applications menu"

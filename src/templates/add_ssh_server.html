@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Add SSH Server
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_ssh_server') }}">
+                        <div class="mb-3">
+                            <label for="host" class="form-label">Host</label>
+                            <input type="text" class="form-control" id="host" name="host" required
+                                   placeholder="e.g., myserver.com or 192.168.1.100">
+                            <div class="form-text">The hostname or IP address of the server</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="port" name="port" value="22"
+                                   min="1" max="65535">
+                            <div class="form-text">SSH port (default: 22)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required
+                                   placeholder="e.g., root or ubuntu">
+                            <div class="form-text">The username to connect with</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Authentication Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="auth_type" id="auth_password" 
+                                       value="password" checked onchange="toggleAuthFields()">
+                                <label class="form-check-label" for="auth_password">
+                                    Password
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="auth_type" id="auth_key" 
+                                       value="key" onchange="toggleAuthFields()">
+                                <label class="form-check-label" for="auth_key">
+                                    SSH Key
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="password_field">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password"
+                                   placeholder="Enter password">
+                        </div>
+
+                        <div class="mb-3" id="key_field" style="display: none;">
+                            <label for="key_path" class="form-label">SSH Key Path</label>
+                            <input type="text" class="form-control" id="key_path" name="key_path"
+                                   placeholder="e.g., ~/.ssh/id_rsa">
+                            <div class="form-text">Path to your private SSH key file</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="description" name="description" rows="2"
+                                      placeholder="Add a description for this server"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Server
+                            </button>
+                            <a href="{{ url_for('ssh_servers') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAuthFields() {
+    const authType = document.querySelector('input[name="auth_type"]:checked').value;
+    const passwordField = document.getElementById('password_field');
+    const keyField = document.getElementById('key_field');
+    
+    if (authType === 'password') {
+        passwordField.style.display = 'block';
+        keyField.style.display = 'none';
+        document.getElementById('password').required = true;
+        document.getElementById('key_path').required = false;
+    } else {
+        passwordField.style.display = 'none';
+        keyField.style.display = 'block';
+        document.getElementById('password').required = false;
+        document.getElementById('key_path').required = true;
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', toggleAuthFields);
+</script>
+{% endblock %} 

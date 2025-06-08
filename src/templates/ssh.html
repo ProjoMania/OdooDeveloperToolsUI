@@ -1,14 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}SSH Server Management - Odoo Developer Tools{% endblock %}
+{% block title %}Remote Server Management - Odoo Developer Tools{% endblock %}
 
-{% block page_title %}SSH Server Management{% endblock %}
+{% block page_title %}Remote Server Management{% endblock %}
 
 {% block content %}
-<!-- Get portal status for premium check -->
-{% set portal_status = get_portal_user_status() %}
-{% set is_premium = portal_status and portal_status.get('is_premium', False) %}
-
 <div class="row mt-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -39,14 +35,6 @@
             <div class="card-header d-flex align-items-center">
                 <i class="fas fa-terminal me-3" style="color: var(--primary-color); font-size: 1.25rem;"></i>
                 <h5 class="mb-0">SSH Servers</h5>
-                {% if not is_premium %}
-                <div class="ms-auto">
-                    <small class="text-muted">
-                        <i class="fas fa-crown text-warning"></i> 
-                        <a href="{{ url_for('settings') }}">Upgrade to Premium</a> for advanced server management
-                    </small>
-                </div>
-                {% endif %}
             </div>
             <div class="card-body">
                 {% if servers %}
@@ -85,23 +73,19 @@
                                             title="Connect to Server">
                                         <i class="fas fa-terminal"></i> Connect
                                     </button>
-                                    
                                     {% if is_premium %}
-                                    <!-- Premium users get server details and management -->
                                     <a href="{{ url_for('ssh_server_details', host=server.host) }}" 
                                        class="btn btn-sm btn-info"
-                                       title="Server Details & Management">
+                                       title="Server Management & Odoo Installation">
                                         <i class="fas fa-cog"></i> Manage
                                     </a>
                                     {% else %}
-                                    <!-- Free users get upgrade prompt -->
-                                    <button class="btn btn-sm btn-outline-warning premium-feature"
-                                            title="Premium Feature - Upgrade to access server management"
-                                            onclick="showPremiumPrompt()">
+                                    <a href="{{ url_for('upgrade_subscription') }}" 
+                                       class="btn btn-sm btn-warning"
+                                       title="Upgrade to Premium for Server Management">
                                         <i class="fas fa-crown"></i> Manage
-                                    </button>
+                                    </a>
                                     {% endif %}
-                                    
                                     <a href="{{ url_for('delete_ssh_server', host=server.host) }}" 
                                        class="btn btn-sm btn-outline-danger"
                                        title="Delete Server">
@@ -137,11 +121,9 @@
                     <li>Easily connect to your servers without remembering details</li>
                     <li>Use aliases instead of IP addresses</li>
                     <li>Store authentication settings securely</li>
-                    {% if is_premium %}
-                    <li><strong>Premium:</strong> Install and manage Odoo instances remotely</li>
-                    <li><strong>Premium:</strong> Start/stop/restart Odoo services</li>
-                    <li><strong>Premium:</strong> Update custom addons from GitHub</li>
-                    {% endif %}
+                    <li>Install and manage Odoo instances remotely</li>
+                    <li>Start/stop/restart Odoo services</li>
+                    <li>Update custom addons from GitHub</li>
                 </ul>
                 <p>All configurations are saved to your <code>~/.ssh/config.d/</code> directory.</p>
             </div>
@@ -151,20 +133,10 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">{% if is_premium %}Premium Features{% else %}Upgrade to Premium{% endif %}</h5>
+                <h5 class="mb-0">Server Management Features</h5>
             </div>
             <div class="card-body">
-                {% if is_premium %}
-                <p><strong>You have access to premium server management features:</strong></p>
-                <ul>
-                    <li>Remote Odoo installation</li>
-                    <li>Service management (start/stop/restart)</li>
-                    <li>Custom addon management</li>
-                    <li>Module installation and updates</li>
-                    <li>Log viewing and monitoring</li>
-                </ul>
-                {% else %}
-                <p><strong>Upgrade to Premium to unlock:</strong></p>
+                <p><strong>Available server management features:</strong></p>
                 <ul>
                     <li>🔧 Remote Odoo installation on your servers</li>
                     <li>⚙️ Service management (start/stop/restart Odoo)</li>
@@ -172,41 +144,12 @@
                     <li>🔄 Module installation and updates</li>
                     <li>📊 Server monitoring and log viewing</li>
                 </ul>
-                <a href="{{ url_for('settings') }}" class="btn btn-warning">
-                    <i class="fas fa-crown"></i> Upgrade to Premium
-                </a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Premium Feature Modal -->
-<div class="modal fade" id="premiumPromptModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-crown text-warning"></i> Premium Feature
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Server management and Odoo installation features are available with a Premium subscription.</p>
-                <p><strong>Premium features include:</strong></p>
-                <ul>
-                    <li>Remote Odoo installation</li>
-                    <li>Service management (start/stop/restart)</li>
-                    <li>Custom addon management with GitHub</li>
-                    <li>Module installation and updates</li>
-                    <li>Server monitoring and logs</li>
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <a href="{{ url_for('settings') }}" class="btn btn-warning">
-                    <i class="fas fa-crown"></i> Upgrade to Premium
-                </a>
+                <p class="text-muted">
+                    <small>
+                        <i class="fas fa-info-circle"></i> 
+                        Some features may require premium subscription. Django portal handles authentication.
+                    </small>
+                </p>
             </div>
         </div>
     </div>
@@ -273,10 +216,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-
-// Show premium prompt modal
-function showPremiumPrompt() {
-    new bootstrap.Modal(document.getElementById('premiumPromptModal')).show();
-}
 </script>
 {% endblock %}
