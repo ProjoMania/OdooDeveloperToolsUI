@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}SSH Terminal - {{ host }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-terminal me-2"></i>
+                        SSH Terminal - {{ host }}
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="clearTerminal()">
+                            <i class="fas fa-eraser me-1"></i> Clear
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="disconnect()">
+                            <i class="fas fa-power-off me-1"></i> Disconnect
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="terminal" style="height: 600px; background-color: #1e1e1e;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<style>
+    .xterm {
+        padding: 10px;
+    }
+    .xterm-viewport {
+        overflow-y: auto !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script>
+    let term;
+    let socket;
+    let fitAddon;
+
+    function initTerminal() {
+        term = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'monospace',
+            theme: {
+                background: '#1e1e1e',
+                foreground: '#ffffff'
+            }
+        });
+
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+        });
+
+        // Connect to WebSocket
+        connectWebSocket();
+    }
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/ssh/{{ host }}`;
+        
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            term.writeln('\r\n\x1B[1;32mConnected to {{ host }}\x1B[0m');
+            term.writeln('\r\n');
+        };
+
+        socket.onmessage = (event) => {
+            term.write(event.data);
+        };
+
+        socket.onclose = () => {
+            term.writeln('\r\n\x1B[1;31mDisconnected from {{ host }}\x1B[0m');
+        };
+
+        socket.onerror = (error) => {
+            term.writeln('\r\n\x1B[1;31mError: ' + error.message + '\x1B[0m');
+        };
+
+        // Handle terminal input
+        term.onData(data => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(data);
+            }
+        });
+    }
+
+    function clearTerminal() {
+        term.clear();
+    }
+
+    function disconnect() {
+        if (socket) {
+            socket.close();
+        }
+        window.location.href = '/servers';
+    }
+
+    // Initialize terminal when page loads
+    document.addEventListener('DOMContentLoaded', initTerminal);
+</script>
+{% endblock %} 

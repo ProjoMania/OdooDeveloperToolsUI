@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Developer Management Tool - Comprehensive developer workspace management
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
-from flask_login import LoginManager, login_required, current_user
 import requests
 import os
 import psycopg2
@@ -24,17 +23,20 @@ from models import Project, Task, TaskNote, ProjectServer, ProjectDatabase, Sett
 from auth import check_subscription_status, subscription_required, premium_feature_required, get_subscription_portal_url
 from src.portal_auth import get_portal_user_status, premium_required
 from flask_sock import Sock
-import threading
-import queue
-import pty
-import select
-import termios
-import tty
-import struct
-import fcntl
-import signal
-import time
-import uuid
+
+# Create a mock user for local development
+class MockUser:
+    is_authenticated = True
+    is_active = True
+    is_anonymous = False
+    github_id = "local-dev"
+    email = "local@example.com"
+    
+    def get_id(self):
+        return "local-user"
+
+# Create a global instance to use throughout the app
+current_user = MockUser()
 
 # Try to import markdown safely
 try:
@@ -70,20 +72,11 @@ with app.app_context():
         print(f"Error creating database tables: {str(e)}")
         raise
 
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
 # Initialize Flask-Sock
 sock = Sock(app)
 
 # Store active SSH sessions
 active_sessions = {}
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 # Register API blueprint
 app.register_blueprint(api_bp)
@@ -100,8 +93,8 @@ logger = logging.getLogger(__name__)
 @app.template_global()
 def get_portal_user_status():
     """Make portal status available in templates"""
-    from src.portal_auth import get_portal_user_status as get_status
-    return get_status()
+    # For local development, always return premium status
+    return {'is_premium': True, 'username': 'local-dev', 'email': 'local@example.com'}
 
 # Global settings
 SSH_CONFIG_DIR = os.path.expanduser("~/.ssh/config.d")
@@ -523,7 +516,6 @@ def ssh_server_details(host):
     return render_template('ssh_server_details.html', server=server, is_premium=is_premium)
 
 @app.route('/servers/<host>/edit', methods=['GET', 'POST'])
-@login_required
 @premium_required
 def edit_ssh_server(host):
     """Edit an existing SSH server configuration"""
@@ -1456,7 +1448,7 @@ def update_task_status(project_id, task_id):
         db.session.commit()
         flash('Task status updated', 'success')
     
-    return redirect(url_for('view_task', project_id=project_id, task_id=task_id))
+    return redirect(url_for('view_task', project_id=project_id, task_id=task.id))
 
 @app.route('/projects/<int:project_id>/tasks/<int:task_id>/notes/add', methods=['POST'])
 def add_task_note(project_id, task_id):
@@ -1474,7 +1466,7 @@ def add_task_note(project_id, task_id):
         db.session.commit()
         flash('Note added', 'success')
     
-    return redirect(url_for('view_task', project_id=project_id, task_id=task_id))
+    return redirect(url_for('view_task', project_id=project_id, task_id=task.id))
 
 @app.route('/projects/<int:project_id>/tasks/<int:task_id>/notes/<int:note_id>/delete', methods=['POST'])
 def delete_task_note(project_id, task_id, note_id):
@@ -1590,9 +1582,9 @@ def unlink_database(project_id, database_id):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     """Application settings page"""
-    # Get portal user status for premium check
-    portal_status = get_portal_user_status()
-    is_premium = portal_status and portal_status.get('is_premium', False)
+    # Get portal user status for premium check - always premium for local dev
+    portal_status = {'is_premium': True}
+    is_premium = True
     
     # Get all settings from the database
     all_settings = Setting.query.all()
@@ -1603,7 +1595,7 @@ def settings():
         settings_dict[setting.key] = setting.value
     
     if request.method == 'POST':
-        # Process form submission
+        # Process form submission as before
         settings_to_update = [
             # PostgreSQL settings
             ('postgres_user', request.form.get('postgres_user', 'postgres')),
@@ -1637,11 +1629,8 @@ def settings():
         flash('Settings saved successfully', 'success')
         return redirect(url_for('settings'))
     
-    # Check subscription status if user is logged in
-    user = None
-    if current_user.is_authenticated:
-        check_subscription_status(current_user)
-        user = current_user
+    # For local development, user is always authenticated
+    user = current_user
     
     return render_template('settings.html', 
                           settings=settings_dict,
@@ -1652,7 +1641,6 @@ def settings():
                           is_premium=is_premium)
 
 @app.route('/upgrade')
-@login_required
 def upgrade_subscription():
     """Redirect to Django portal for subscription upgrade"""
     if not current_user.github_id:
@@ -1677,33 +1665,17 @@ def generate_subscription_token(user):
 
 # === Premium Feature Routes ===
 @app.route('/premium-features')
-@login_required
 @premium_feature_required
 def premium_features():
     """Show available premium features"""
     return render_template('premium_features.html', user=current_user)
 
 @app.route('/odoo/install')
-@login_required
 @premium_required
 def odoo_install():
     """Odoo installation page"""
     servers = get_ssh_servers()
     return render_template('odoo_install.html', servers=servers)
-
-# === Login Routes ===
-@app.route('/login')
-def login():
-    """Redirect to Django portal for login"""
-    portal_url = get_subscription_portal_url()
-    return redirect(f"{portal_url}/login?next={request.url}")
-
-@app.route('/logout')
-def logout():
-    """Logout user and redirect to Django portal"""
-    session.clear()
-    portal_url = get_subscription_portal_url()
-    return redirect(f"{portal_url}/logout")
 
 @sock.route('/ws/ssh/<host>')
 def ssh_terminal(ws, host):
