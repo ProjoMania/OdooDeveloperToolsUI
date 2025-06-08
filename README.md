@@ -153,7 +153,7 @@ To make the application start automatically at system boot, you can set it up as
    sudo systemctl status odoo-developer-tools.service
    ```
 
-> **Note:** The service runs the Flask application in the background. You can access it by opening a web browser and navigating to `http://localhost:5000`
+> **Note:** The service runs the Flask application in the background. You can access it by opening a web browser and navigating to `http://127.0.0.1:5000`
 
 ### Updating the Application
 

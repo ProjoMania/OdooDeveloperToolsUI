@@ -142,7 +142,7 @@ EOF
         echo -e "${GREEN}Service has been started successfully.${NC}"
         echo -e "${GREEN}The application will now start automatically on system boot.${NC}"
         echo -e "${GREEN}Application has been installed to: $APP_DIR${NC}"
-        echo -e "${YELLOW}Access the application at: http://localhost:5000${NC}"
+        echo -e "${YELLOW}Access the application at: http://127.0.0.1:5000${NC}"
         return 0
     else
         echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
@@ -323,7 +323,7 @@ echo
 
 if [ $SERVICE_RESULT -eq 0 ]; then
     echo -e "You can access the Odoo Developer Tools UI:"
-    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://localhost:5000${NC}"
+    echo -e "  1. By opening a web browser and navigating to ${BLUE}http://127.0.0.1:5000${NC}"
     echo -e "  2. The service will start automatically when your system boots"
     echo -e "  3. To control the service: ${YELLOW}sudo systemctl [start|stop|restart|status] odoo-developer-tools.service${NC}"
 else

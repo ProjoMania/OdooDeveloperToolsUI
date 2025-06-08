@@ -130,7 +130,7 @@ def get_db_connection():
             # Get settings with defaults if not set
             user = get_setting('postgres_user', 'postgres')
             password = get_setting('postgres_password', '')
-            host = get_setting('postgres_host', 'localhost')
+            host = get_setting('postgres_host', '127.0.0.1')
             port = get_setting('postgres_port', '5432')
 
         logger.info(f"Attempting to connect to PostgreSQL at {host}:{port} as user {user}")
@@ -778,7 +778,7 @@ def list_databases():
                     dbname=db_name,
                     user=get_setting('postgres_user', 'postgres'),
                     password=get_setting('postgres_password', ''),
-                    host=get_setting('postgres_host', 'localhost'),
+                    host=get_setting('postgres_host', '127.0.0.1'),
                     port=get_setting('postgres_port', '5432')
                 )
                 db_cursor = db_conn.cursor()
@@ -1081,7 +1081,7 @@ def extend_enterprise(db_name=None):
     try:
         # Get PostgreSQL connection settings directly to show in debug log
         postgres_user = get_setting('postgres_user', 'postgres')
-        postgres_host = get_setting('postgres_host', 'localhost')
+        postgres_host = get_setting('postgres_host', '127.0.0.1')
         postgres_port = get_setting('postgres_port', '5432')
                 
         conn = get_db_connection()
@@ -1108,7 +1108,7 @@ def extend_enterprise(db_name=None):
             # Use complete connection settings from the database
             postgres_user = get_setting('postgres_user', 'postgres')
             postgres_password = get_setting('postgres_password', '')
-            postgres_host = get_setting('postgres_host', 'localhost')
+            postgres_host = get_setting('postgres_host', '127.0.0.1')
             postgres_port = get_setting('postgres_port', '5432')
             
             # Connect with appropriate parameters based on whether password is set
@@ -1190,14 +1190,14 @@ def extend_enterprise(db_name=None):
                         dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
                         password=get_setting('postgres_password', ''),
-                        host=get_setting('postgres_host', 'localhost'),
+                        host=get_setting('postgres_host', '127.0.0.1'),
                         port=get_setting('postgres_port', '5432')
                     )
                 else:
                     db_conn = psycopg2.connect(
                         dbname=selected_db_name,
                         user=get_setting('postgres_user', 'postgres'),
-                        host=get_setting('postgres_host', 'localhost'),
+                        host=get_setting('postgres_host', '127.0.0.1'),
                         port=get_setting('postgres_port', '5432')
                     )
                 db_conn.autocommit = True
@@ -1736,7 +1736,7 @@ def settings():
             # PostgreSQL settings
             ('postgres_user', request.form.get('postgres_user', 'postgres')),
             ('postgres_password', request.form.get('postgres_password', '')),
-            ('postgres_host', request.form.get('postgres_host', 'localhost')),
+            ('postgres_host', request.form.get('postgres_host', '127.0.0.1')),
             ('postgres_port', request.form.get('postgres_port', '5432')),
             
             # File paths
@@ -1948,7 +1948,7 @@ if __name__ == '__main__':
                 # PostgreSQL settings
                 ('postgres_user', 'postgres', 'Default PostgreSQL username'),
                 ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
-                ('postgres_host', 'localhost', 'PostgreSQL server hostname'),
+                ('postgres_host', '127.0.0.1', 'PostgreSQL server hostname'),
                 ('postgres_port', '5432', 'PostgreSQL server port'),
                 
                 # File paths

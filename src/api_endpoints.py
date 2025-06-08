@@ -13,7 +13,7 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
 
 # Configure Django portal URL
-DJANGO_PORTAL_URL = os.getenv('DJANGO_PORTAL_URL', 'http://localhost:8000')
+DJANGO_PORTAL_URL = os.getenv('DJANGO_PORTAL_URL', 'http://127.0.0.1:8000')
 
 # API endpoint to get the record count for a database
 @api_bp.route('/database/<db_name>/record_count', methods=['GET'])

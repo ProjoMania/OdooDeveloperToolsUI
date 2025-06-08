@@ -192,7 +192,7 @@ echo -e " ✅ ${BLUE}Files updated in $INSTALL_PATH${NC}"
 if [ "$IS_OPT_INSTALL" = true ]; then
     if sudo systemctl is-active --quiet odoo-developer-tools.service; then
         echo -e " ✅ ${BLUE}Service restarted and running${NC}"
-        echo -e "\nThe application is running at: ${BLUE}http://localhost:5000${NC}"
+        echo -e "\nThe application is running at: ${BLUE}http://127.0.0.1:5000${NC}"
     else
         echo -e " ❌ ${RED}Service is not running${NC}"
         echo -e "\nYou can try manually starting the service with: ${YELLOW}sudo systemctl start odoo-developer-tools.service${NC}"
