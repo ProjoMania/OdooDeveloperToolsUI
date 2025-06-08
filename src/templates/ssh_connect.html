@@ -80,9 +80,14 @@
                                     <div class="bg-light p-2 rounded mb-3">
                                         <code>{{ command }}</code>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-dark copy-command" data-command="{{ command }}">
-                                        <i class="fas fa-copy me-1"></i> Copy Command
-                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-dark copy-ssh-command" data-command="{{ command }}">
+                                            <i class="fas fa-copy me-1"></i> Copy SSH Command
+                                        </button>
+                                        <a href="{{ url_for('ssh_terminal_page', host=server.host) }}" class="btn btn-primary">
+                                            <i class="fas fa-terminal me-1"></i> Open Terminal
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>

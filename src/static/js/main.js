@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Create a form to submit the command as POST
                         const form = document.createElement('form');
                         form.method = 'post';
-                        form.action = '/servers/connect';
+                        form.action = `/servers/connect/${host}`;
                         form.style.display = 'none';
                         
                         // Add the command

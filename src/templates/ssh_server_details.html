@@ -15,10 +15,13 @@
 
     <!-- Server Information Card -->
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
                 <i class="fas fa-server me-2"></i>Server Information
             </h5>
+            <a href="{{ url_for('edit_ssh_server', host=server.host) }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-edit"></i> Edit Server
+            </a>
         </div>
         <div class="card-body">
             <div class="row">

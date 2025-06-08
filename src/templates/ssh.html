@@ -73,11 +73,19 @@
                                             title="Connect to Server">
                                         <i class="fas fa-terminal"></i> Connect
                                     </button>
+                                    {% if is_premium %}
                                     <a href="{{ url_for('ssh_server_details', host=server.host) }}" 
                                        class="btn btn-sm btn-info"
                                        title="Server Management & Odoo Installation">
                                         <i class="fas fa-cog"></i> Manage
                                     </a>
+                                    {% else %}
+                                    <a href="{{ url_for('upgrade_subscription') }}" 
+                                       class="btn btn-sm btn-warning"
+                                       title="Upgrade to Premium for Server Management">
+                                        <i class="fas fa-crown"></i> Manage
+                                    </a>
+                                    {% endif %}
                                     <a href="{{ url_for('delete_ssh_server', host=server.host) }}" 
                                        class="btn btn-sm btn-outline-danger"
                                        title="Delete Server">

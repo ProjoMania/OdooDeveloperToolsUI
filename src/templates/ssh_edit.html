@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Edit SSH Server - {{ server.host }}{% endblock %}
+
+{% block page_title %}Edit SSH Server{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Edit Server: {{ server.host }}</h1>
+        <a href="{{ url_for('ssh_server_details', host=server.host) }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Server Details
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_ssh_server', host=server.host) }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="host" class="form-label">Host Name</label>
+                            <input type="text" class="form-control" id="host" name="host" value="{{ server.host }}" required>
+                            <div class="form-text">The name you use to connect to this server (e.g., myserver)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="hostname" class="form-label">IP/Domain</label>
+                            <input type="text" class="form-control" id="hostname" name="hostname" value="{{ server.hostname }}" required>
+                            <div class="form-text">The actual IP address or domain name of the server</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="user" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="user" name="user" value="{{ server.user }}">
+                            <div class="form-text">Leave empty to use your local username</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="port" name="port" value="{{ server.port }}" min="1" max="65535">
+                            <div class="form-text">Default is 22</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Authentication Method</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="auth_method" id="auth_key" value="key" 
+                               {% if server.key_file %}checked{% endif %}>
+                        <label class="form-check-label" for="auth_key">
+                            SSH Key
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="auth_method" id="auth_password" value="password"
+                               {% if not server.key_file %}checked{% endif %}>
+                        <label class="form-check-label" for="auth_password">
+                            Password
+                        </label>
+                    </div>
+                </div>
+
+                <div id="key_file_section" class="mb-3" {% if not server.key_file %}style="display: none;"{% endif %}>
+                    <label for="key_file" class="form-label">SSH Key File</label>
+                    <input type="text" class="form-control" id="key_file" name="key_file" value="{{ server.key_file }}">
+                    <div class="form-text">Path to your private key file (e.g., ~/.ssh/id_rsa)</div>
+                </div>
+
+                <div id="password_section" class="mb-3" {% if server.key_file %}style="display: none;"{% endif %}>
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password">
+                    <div class="form-text">Leave empty to keep the current password</div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('ssh_server_details', host=server.host) }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authKey = document.getElementById('auth_key');
+    const authPassword = document.getElementById('auth_password');
+    const keyFileSection = document.getElementById('key_file_section');
+    const passwordSection = document.getElementById('password_section');
+
+    function updateAuthSections() {
+        if (authKey.checked) {
+            keyFileSection.style.display = 'block';
+            passwordSection.style.display = 'none';
+        } else {
+            keyFileSection.style.display = 'none';
+            passwordSection.style.display = 'block';
+        }
+    }
+
+    authKey.addEventListener('change', updateAuthSections);
+    authPassword.addEventListener('change', updateAuthSections);
+});
+</script>
+{% endblock %} 

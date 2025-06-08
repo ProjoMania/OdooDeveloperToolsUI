@@ -18,10 +18,31 @@ import glob
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import logging
-import markdown
+import importlib.metadata
+import importlib.util
 from models import Project, Task, TaskNote, ProjectServer, ProjectDatabase, Setting, User
 from auth import check_subscription_status, subscription_required, premium_feature_required, get_subscription_portal_url
 from src.portal_auth import get_portal_user_status, premium_required
+from flask_sock import Sock
+import threading
+import queue
+import pty
+import select
+import termios
+import tty
+import struct
+import fcntl
+import signal
+import time
+import uuid
+
+# Try to import markdown safely
+try:
+    import markdown
+    MARKDOWN_AVAILABLE = True
+except (ImportError, AttributeError):
+    MARKDOWN_AVAILABLE = False
+    logging.warning("Markdown support is not available")
 
 # Initialize Flask application
 app = Flask(__name__, 
@@ -32,14 +53,33 @@ app.config['UPLOAD_FOLDER'] = '/tmp/odoo_dev_tools_uploads'
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dev_tools.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Initialize database
 db.init_app(app)
+
+# Create database tables
+with app.app_context():
+    try:
+        db.create_all()
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Error creating database tables: {str(e)}")
+        raise
 
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Initialize Flask-Sock
+sock = Sock(app)
+
+# Store active SSH sessions
+active_sessions = {}
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -206,6 +246,60 @@ def update_main_ssh_config():
     with open(ssh_config_file, 'a') as f:
         f.write(f"\n{include_line}\n")
 
+def get_ssh_config(host):
+    """Get SSH configuration for a host"""
+    config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+    if not os.path.exists(config_file):
+        return None
+        
+    config = {}
+    with open(config_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, value = line.split(' ', 1)
+                config[key] = value.strip()
+    return config
+
+def create_ssh_client(host):
+    """Create and configure SSH client"""
+    config = get_ssh_config(host)
+    if not config:
+        return None
+        
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        # Get connection parameters
+        hostname = config.get('HostName', host)
+        username = config.get('User', os.getenv('USER'))
+        port = int(config.get('Port', 22))
+        
+        # Connect using key or password
+        if 'IdentityFile' in config:
+            key_path = os.path.expanduser(config['IdentityFile'])
+            client.connect(
+                hostname=hostname,
+                username=username,
+                key_filename=key_path,
+                port=port
+            )
+        else:
+            # Try to get password from config or environment
+            password = os.getenv('SSH_PASSWORD', '')
+            client.connect(
+                hostname=hostname,
+                username=username,
+                password=password,
+                port=port
+            )
+            
+        return client
+    except Exception as e:
+        print(f"SSH connection error: {str(e)}")
+        return None
+
 # === Routes ===
 
 @app.route('/')
@@ -214,7 +308,6 @@ def index():
     return render_template('index.html')
 
 # === SSH Server Routes ===
-
 @app.route('/servers')
 def ssh_servers():
     """Remote Server management page"""
@@ -298,7 +391,6 @@ def add_ssh_server():
     
     return render_template('ssh_add.html')
 
-
 @app.route('/servers/delete/<host>', methods=['GET', 'POST'])
 def delete_ssh_server(host):
     """Delete a Remote Server configuration"""
@@ -361,40 +453,85 @@ def generate_ssh_command(host):
     
     return jsonify({'error': 'Server not found'})
 
-@app.route('/servers/connect', methods=['POST'])
-def ssh_connect():
-    # Handle SSH connection request
-    if request.method == 'POST':
-        command = request.form.get('command')
-        server_host = request.form.get('server_host', '')
-        auth_type = request.form.get('auth_type', 'key')
-        user = request.form.get('user', '')
-        hostname = request.form.get('hostname', '')
+@app.route('/servers/connect/<host>')
+def connect_ssh(host):
+    """Connect to SSH server"""
+    try:
+        # Get server from user configuration
+        config_file = os.path.expanduser('~/.odoo_dev_tools/config.json')
+        if not os.path.exists(config_file):
+            flash('Server configuration not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+            servers = config.get('ssh_servers', [])
+            server_config = next((s for s in servers if s['host'] == host), None)
+            
+        if not server_config:
+            flash('Server not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+        # Create SSHServer object
+        server = SSHServer(
+            host=server_config['host'],
+            port=server_config.get('port', 22),
+            username=server_config['username'],
+            password=server_config.get('password'),
+            key_path=server_config.get('key_path'),
+            auth_type=server_config.get('auth_type', 'password'),
+            description=server_config.get('description', ''),
+            is_active=True
+        )
         
-        if command:
-            try:
-                # Prepare server information for the template
-                server_info = {
-                    'host': server_host,
-                    'auth_type': auth_type,
-                    'user': user,
-                    'hostname': hostname
-                }
+        # Create SSH client
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect to server
+        try:
+            if server.auth_type == 'password':
+                client.connect(
+                    hostname=server.host,
+                    port=server.port,
+                    username=server.username,
+                    password=server.password
+                )
+            else:  # key-based auth
+                client.connect(
+                    hostname=server.host,
+                    port=server.port,
+                    username=server.username,
+                    key_filename=server.key_path
+                )
                 
-                # Redirect to a terminal command using the SSH command
-                # This could be customized based on your environment and terminal preferences
-                return render_template('ssh_connect.html', command=command, server_info=server_info)
-            except Exception as e:
-                flash(f'Error connecting to SSH: {str(e)}', 'error')
-                return redirect(url_for('ssh_servers'))
-    
-    # If we get here, something went wrong
-    flash('Invalid SSH connection request', 'error')
-    return redirect(url_for('ssh_servers'))
+            # Create session
+            session_id = str(uuid.uuid4())
+            active_sessions[session_id] = {
+                'client': client,
+                'host': server.host,
+                'start_time': datetime.now()
+            }
+            
+            flash(f'Successfully connected to {server.host}', 'success')
+            return redirect(url_for('ssh_terminal_page', host=server.host))
+            
+        except Exception as e:
+            flash(f'Error connecting to SSH: {str(e)}', 'error')
+            return redirect(url_for('ssh_servers'))
+            
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('ssh_servers'))
 
 @app.route('/servers/<host>/details')
+@premium_required
 def ssh_server_details(host):
     """Remote Server details page for managing servers and installing Odoo"""
+    # Get portal user status for premium check
+    portal_status = get_portal_user_status()
+    is_premium = portal_status and portal_status.get('is_premium', False)
+    
     servers = get_ssh_servers()
     
     # Find the specific server
@@ -408,7 +545,89 @@ def ssh_server_details(host):
         flash(f'SSH server "{host}" not found', 'danger')
         return redirect(url_for('ssh_servers'))
     
-    return render_template('ssh_server_details.html', server=server)
+    return render_template('ssh_server_details.html', server=server, is_premium=is_premium)
+
+@app.route('/servers/<host>/edit', methods=['GET', 'POST'])
+@login_required
+@premium_required
+def edit_ssh_server(host):
+    """Edit an existing SSH server configuration"""
+    # Get portal user status for premium check
+    portal_status = get_portal_user_status()
+    is_premium = portal_status and portal_status.get('is_premium', False)
+    
+    if not is_premium:
+        flash('This feature requires a premium subscription', 'warning')
+        return redirect(url_for('settings'))
+    
+    # Get all servers
+    servers = get_ssh_servers()
+    
+    # Find the specific server
+    server = None
+    for s in servers:
+        if s['host'] == host:
+            server = s
+            break
+    
+    if not server:
+        flash(f'SSH server "{host}" not found', 'danger')
+        return redirect(url_for('ssh_servers'))
+    
+    if request.method == 'POST':
+        # Get form data
+        new_host = request.form.get('host').strip()
+        hostname = request.form.get('hostname').strip()
+        user = request.form.get('user').strip()
+        port = request.form.get('port').strip() or "22"
+        auth_method = request.form.get('auth_method', 'key')
+        key_file = request.form.get('key_file', '').strip() if auth_method == 'key' else ''
+        password = request.form.get('password', '').strip() if auth_method == 'password' else ''
+        
+        # Validate inputs
+        if not new_host or not hostname:
+            flash('Host and IP/Domain are required fields', 'danger')
+            return render_template('ssh_edit.html', server=server)
+        
+        # Create config file
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+        new_config_file = os.path.join(SSH_CONFIG_DIR, f"{new_host}.conf")
+        
+        # Check if new hostname already exists (if changed)
+        if new_host != host and os.path.exists(new_config_file):
+            flash(f'SSH configuration for {new_host} already exists', 'danger')
+            return render_template('ssh_edit.html', server=server)
+        
+        # Write the configuration file
+        with open(config_file, 'w') as f:
+            f.write(f"Host {new_host}\n")
+            f.write(f"    HostName {hostname}\n")
+            if user:
+                f.write(f"    User {user}\n")
+            f.write(f"    Port {port}\n")
+            
+            # Authentication settings
+            if auth_method == 'key' and key_file:
+                f.write(f"    IdentityFile {key_file}\n")
+                f.write(f"    PreferredAuthentications publickey\n")
+            elif auth_method == 'password' and password:
+                f.write(f"    PreferredAuthentications password\n")
+                f.write(f"    PasswordAuthentication yes\n")
+                # Store password in a safer way in a real-world application
+                # For this demo, we'll add it as a comment (NOT recommended for production)
+                f.write(f"    # Password: {password}\n")
+        
+        # Rename config file if hostname changed
+        if new_host != host:
+            os.rename(config_file, new_config_file)
+        
+        # Update main SSH config if needed
+        update_main_ssh_config()
+        
+        flash(f'SSH server "{new_host}" updated successfully', 'success')
+        return redirect(url_for('ssh_server_details', host=new_host))
+    
+    return render_template('ssh_edit.html', server=server)
 
 # === Database Routes ===
 
@@ -1510,6 +1729,101 @@ def logout():
     session.clear()
     portal_url = get_subscription_portal_url()
     return redirect(f"{portal_url}/logout")
+
+@sock.route('/ws/ssh/<host>')
+def ssh_terminal(ws, host):
+    """WebSocket endpoint for SSH terminal"""
+    try:
+        # Get server details
+        server = SSHServer.query.filter_by(host=host).first()
+        if not server:
+            ws.send(json.dumps({'type': 'error', 'message': 'Server not found'}))
+            return
+
+        # Create SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect to server
+        ssh.connect(
+            hostname=server.host,
+            port=server.port,
+            username=server.username,
+            password=server.password if server.auth_type == 'password' else None,
+            key_filename=server.key_path if server.auth_type == 'key' else None
+        )
+        
+        # Create interactive shell
+        channel = ssh.invoke_shell()
+        channel.settimeout(0.1)
+        
+        # Store session
+        session_id = f"{host}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        active_sessions[session_id] = {
+            'ssh': ssh,
+            'channel': channel,
+            'last_activity': datetime.now()
+        }
+        
+        # Send initial connection success
+        ws.send(json.dumps({
+            'type': 'connected',
+            'message': f'Connected to {server.host}'
+        }))
+        
+        # Main terminal loop
+        while True:
+            try:
+                # Check for incoming WebSocket messages
+                message = ws.receive()
+                if message:
+                    data = json.loads(message)
+                    if data['type'] == 'input':
+                        channel.send(data['data'])
+                    elif data['type'] == 'resize':
+                        channel.get_pty(term='xterm', width=data['cols'], height=data['rows'])
+                
+                # Check for incoming SSH data
+                if channel.recv_ready():
+                    data = channel.recv(4096).decode('utf-8', errors='ignore')
+                    ws.send(json.dumps({
+                        'type': 'output',
+                        'data': data
+                    }))
+                
+                # Check for errors
+                if channel.recv_stderr_ready():
+                    error = channel.recv_stderr(4096).decode('utf-8', errors='ignore')
+                    ws.send(json.dumps({
+                        'type': 'error',
+                        'data': error
+                    }))
+                
+                # Check if channel is closed
+                if channel.exit_status_ready():
+                    break
+                    
+            except Exception as e:
+                ws.send(json.dumps({
+                    'type': 'error',
+                    'message': str(e)
+                }))
+                break
+                
+    except Exception as e:
+        ws.send(json.dumps({
+            'type': 'error',
+            'message': str(e)
+        }))
+    finally:
+        # Clean up
+        if 'session_id' in locals():
+            if session_id in active_sessions:
+                session = active_sessions[session_id]
+                session['channel'].close()
+                session['ssh'].close()
+                del active_sessions[session_id]
+
 
 # === Run the Application ===
 if __name__ == '__main__':
