@@ -453,74 +453,177 @@ def generate_ssh_command(host):
     
     return jsonify({'error': 'Server not found'})
 
-@app.route('/servers/connect/<host>')
+@app.route('/servers/connect/<host>', methods=['GET', 'POST'])
 def connect_ssh(host):
     """Connect to SSH server"""
     try:
-        # Get server from user configuration
-        config_file = os.path.expanduser('~/.odoo_dev_tools/config.json')
+        # Get server configuration from SSH config
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
         if not os.path.exists(config_file):
             flash('Server configuration not found', 'error')
             return redirect(url_for('ssh_servers'))
             
+        # Parse SSH config
+        hostname = None
+        user = None
+        port = 22
+        auth_method = 'key'
+        key_file = None
+        password = None
+        
         with open(config_file, 'r') as f:
-            config = json.load(f)
-            servers = config.get('ssh_servers', [])
-            server_config = next((s for s in servers if s['host'] == host), None)
-            
-        if not server_config:
-            flash('Server not found', 'error')
+            for line in f:
+                line = line.strip()
+                if line.startswith('HostName'):
+                    hostname = line.split(' ', 1)[1].strip()
+                elif line.startswith('User'):
+                    user = line.split(' ', 1)[1].strip()
+                elif line.startswith('Port'):
+                    port = int(line.split(' ', 1)[1].strip())
+                elif line.startswith('IdentityFile'):
+                    key_file = line.split(' ', 1)[1].strip()
+                    auth_method = 'key'
+                elif line.startswith('PreferredAuthentications'):
+                    if 'password' in line.lower():
+                        auth_method = 'password'
+                elif line.startswith('# Password:'):
+                    password = line.split(':', 1)[1].strip()
+        
+        if not hostname:
+            flash('Invalid server configuration: HostName not found', 'error')
             return redirect(url_for('ssh_servers'))
             
-        # Create SSHServer object
-        server = SSHServer(
-            host=server_config['host'],
-            port=server_config.get('port', 22),
-            username=server_config['username'],
-            password=server_config.get('password'),
-            key_path=server_config.get('key_path'),
-            auth_type=server_config.get('auth_type', 'password'),
-            description=server_config.get('description', ''),
-            is_active=True
-        )
-        
+        if not user:
+            flash('Invalid server configuration: User not found', 'error')
+            return redirect(url_for('ssh_servers'))
+            
         # Create SSH client
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
         # Connect to server
         try:
-            if server.auth_type == 'password':
+            print(f"Connecting to {hostname} as {user} using {auth_method} authentication")  # Debug log
+            
+            if auth_method == 'password':
+                if not password:
+                    flash('Password authentication selected but no password found in config', 'error')
+                    return redirect(url_for('ssh_servers'))
+                    
+                print("Attempting password authentication")  # Debug log
                 client.connect(
-                    hostname=server.host,
-                    port=server.port,
-                    username=server.username,
-                    password=server.password
+                    hostname=hostname,
+                    port=port,
+                    username=user,
+                    password=password,
+                    look_for_keys=False,  # Don't look for keys when using password auth
+                    allow_agent=False     # Don't use SSH agent when using password auth
                 )
             else:  # key-based auth
-                client.connect(
-                    hostname=server.host,
-                    port=server.port,
-                    username=server.username,
-                    key_filename=server.key_path
-                )
+                if not key_file:
+                    flash('Key authentication selected but no key file found in config', 'error')
+                    return redirect(url_for('ssh_servers'))
+                    
+                print(f"Attempting key authentication with key file: {key_file}")  # Debug log
+                
+                # Try to load the key file
+                try:
+                    # First try loading as OpenSSH key
+                    key = paramiko.RSAKey.from_private_key_file(key_file)
+                except Exception as e:
+                    print(f"Failed to load key as OpenSSH format: {str(e)}")  # Debug log
+                    try:
+                        # Try loading as RSA key
+                        key = paramiko.RSAKey.from_private_key_file(key_file, password=None)
+                    except Exception as e:
+                        print(f"Failed to load key as RSA format: {str(e)}")  # Debug log
+                        flash('Failed to load SSH key. Please check the key file format.', 'error')
+                        return redirect(url_for('ssh_servers'))
+                
+                # Connect using the loaded key
+                try:
+                    client.connect(
+                        hostname=hostname,
+                        port=port,
+                        username=user,
+                        pkey=key,
+                        look_for_keys=False,  # Only use the specified key file
+                        allow_agent=False,    # Don't use SSH agent
+                        timeout=10            # Add timeout
+                    )
+                except paramiko.AuthenticationException as e:
+                    print(f"Authentication failed with key: {str(e)}")  # Debug log
+                    # Try connecting with system SSH agent as fallback
+                    try:
+                        print("Trying to connect using system SSH agent...")  # Debug log
+                        client.connect(
+                            hostname=hostname,
+                            port=port,
+                            username=user,
+                            look_for_keys=True,  # Look for keys in default locations
+                            allow_agent=True,    # Use SSH agent
+                            timeout=10
+                        )
+                    except Exception as e:
+                        print(f"Failed to connect using SSH agent: {str(e)}")  # Debug log
+                        # Try using system SSH command as last resort
+                        try:
+                            print("Trying to connect using system SSH command...")  # Debug log
+                            # Create a temporary script to test SSH connection
+                            script_path = os.path.join(tempfile.gettempdir(), f"ssh_test_{host}.sh")
+                            with open(script_path, 'w') as f:
+                                f.write(f"""#!/bin/bash
+ssh -F ~/.ssh/config {host} 'echo "Connection successful"'
+""")
+                            os.chmod(script_path, 0o755)
+                            
+                            # Run the script
+                            result = subprocess.run([script_path], capture_output=True, text=True)
+                            if result.returncode == 0:
+                                # If SSH command works, create a new SSH client
+                                client = paramiko.SSHClient()
+                                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                                client.connect(
+                                    hostname=hostname,
+                                    port=port,
+                                    username=user,
+                                    look_for_keys=True,
+                                    allow_agent=True,
+                                    timeout=10
+                                )
+                            else:
+                                print(f"SSH command failed: {result.stderr}")  # Debug log
+                                raise Exception("SSH command failed")
+                        except Exception as e:
+                            print(f"Failed to connect using SSH command: {str(e)}")  # Debug log
+                            raise
                 
             # Create session
             session_id = str(uuid.uuid4())
             active_sessions[session_id] = {
                 'client': client,
-                'host': server.host,
+                'host': host,
                 'start_time': datetime.now()
             }
             
-            flash(f'Successfully connected to {server.host}', 'success')
-            return redirect(url_for('ssh_terminal_page', host=server.host))
+            flash(f'Successfully connected to {host}', 'success')
+            return redirect(url_for('ssh_terminal_page', host=host))
             
+        except paramiko.AuthenticationException as e:
+            print(f"Authentication failed: {str(e)}")  # Debug log
+            flash('Authentication failed. Please check your credentials.', 'error')
+            return redirect(url_for('ssh_servers'))
+        except paramiko.SSHException as e:
+            print(f"SSH error: {str(e)}")  # Debug log
+            flash(f'SSH error: {str(e)}', 'error')
+            return redirect(url_for('ssh_servers'))
         except Exception as e:
+            print(f"Connection error: {str(e)}")  # Debug log
             flash(f'Error connecting to SSH: {str(e)}', 'error')
             return redirect(url_for('ssh_servers'))
             
     except Exception as e:
+        print(f"General error: {str(e)}")  # Debug log
         flash(f'Error: {str(e)}', 'error')
         return redirect(url_for('ssh_servers'))
 

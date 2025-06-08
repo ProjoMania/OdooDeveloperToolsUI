@@ -35,20 +35,19 @@
                                     <tr>
                                         <td>{{ server.host }}</td>
                                         <td>{{ server.port }}</td>
-                                        <td>{{ server.username }}</td>
+                                        <td>{{ server.user }}</td>
                                         <td>
-                                            {% if server.auth_type == 'password' %}
-                                                <span class="badge bg-info">Password</span>
-                                            {% else %}
+                                            {% if server.key_file %}
                                                 <span class="badge bg-warning">SSH Key</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Password</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ server.description or '' }}</td>
                                         <td>
                                             <div class="btn-group">
                                                 <a href="{{ url_for('connect_ssh', host=server.host) }}" 
-                                                   class="btn btn-sm btn-success"
-                                                   onclick="connectToServer('{{ server.host }}'); return false;">
+                                                   class="btn btn-sm btn-success">
                                                     <i class="fas fa-terminal me-1"></i>Connect
                                                 </a>
                                                 <a href="{{ url_for('delete_ssh_server', host=server.host) }}" 

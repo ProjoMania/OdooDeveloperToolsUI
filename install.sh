@@ -150,6 +150,71 @@ EOF
     fi
 }
 
+# Function to setup SSH
+setup_ssh() {
+    echo -e "${BLUE}Setting up SSH configuration...${NC}"
+    
+    # Create SSH directory if it doesn't exist
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    
+    # Create SSH config directory if it doesn't exist
+    mkdir -p ~/.ssh/config.d
+    chmod 700 ~/.ssh/config.d
+    
+    # Create or update SSH config
+    SSH_CONFIG="$HOME/.ssh/config"
+    if [ ! -f "$SSH_CONFIG" ]; then
+        touch "$SSH_CONFIG"
+        chmod 600 "$SSH_CONFIG"
+        echo -e "${GREEN}Created SSH config file.${NC}"
+    fi
+    
+    # Add Include directive if not present
+    if ! grep -q "^Include ~/.ssh/config.d/\*" "$SSH_CONFIG"; then
+        echo -e "\n# Include all config files from config.d directory\nInclude ~/.ssh/config.d/*" >> "$SSH_CONFIG"
+        echo -e "${GREEN}Added Include directive to SSH config.${NC}"
+    fi
+    
+    # Check if SSH agent is running
+    if ! pgrep -x "ssh-agent" > /dev/null; then
+        echo -e "${YELLOW}Starting SSH agent...${NC}"
+        eval "$(ssh-agent -s)"
+    fi
+    
+    # Add SSH key to agent if it exists
+    if [ -f ~/.ssh/id_rsa ]; then
+        echo -e "${YELLOW}Adding SSH key to agent...${NC}"
+        ssh-add ~/.ssh/id_rsa 2>/dev/null
+        echo -e "${GREEN}SSH key added to agent.${NC}"
+    else
+        echo -e "${YELLOW}No SSH key found. Would you like to generate one? (y/n)${NC}"
+        read -r generate_key
+        if [[ $generate_key =~ ^[Yy]$ ]]; then
+            ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+            ssh-add ~/.ssh/id_rsa
+            echo -e "${GREEN}SSH key generated and added to agent.${NC}"
+        fi
+    fi
+    
+    # Add SSH agent configuration to shell startup
+    SHELL_RC=""
+    if [ -f ~/.bashrc ]; then
+        SHELL_RC=~/.bashrc
+    elif [ -f ~/.zshrc ]; then
+        SHELL_RC=~/.zshrc
+    fi
+    
+    if [ -n "$SHELL_RC" ]; then
+        if ! grep -q "ssh-agent" "$SHELL_RC"; then
+            echo -e "\n# Start SSH agent if not running\nif ! pgrep -x \"ssh-agent\" > /dev/null; then\n    eval \"\$(ssh-agent -s)\"\n    ssh-add ~/.ssh/id_rsa 2>/dev/null\nfi" >> "$SHELL_RC"
+            echo -e "${GREEN}Added SSH agent configuration to $SHELL_RC${NC}"
+        fi
+    fi
+    
+    echo -e "${GREEN}SSH setup completed.${NC}"
+}
+
 # Install dependencies based on distribution
 install_dependencies() {
     local distro=$(detect_distro)
@@ -200,6 +265,10 @@ echo
 echo -e "${BLUE}Installing system dependencies...${NC}"
 install_dependencies
 
+# Setup SSH
+echo
+setup_ssh
+
 # Install Python packages
 echo
 echo -e "${BLUE}Installing Python packages...${NC}"
@@ -237,26 +306,6 @@ echo
 echo -e "${BLUE}Creating necessary directories...${NC}"
 mkdir -p ~/.ssh/config.d
 mkdir -p ~/.local/share/Odoo/filestore
-
-# Update the SSH config
-echo -e "${BLUE}Updating SSH configuration...${NC}"
-SSH_CONFIG="$HOME/.ssh/config"
-
-# Create the SSH config file if it doesn't exist
-if [ ! -f "$SSH_CONFIG" ]; then
-    mkdir -p "$HOME/.ssh"
-    touch "$SSH_CONFIG"
-    chmod 600 "$SSH_CONFIG"
-    echo -e "${GREEN}Created SSH config file.${NC}"
-fi
-
-# Check if the Include line is already in the config
-if ! grep -q "Include $HOME/.ssh/config.d/\*.conf" "$SSH_CONFIG"; then
-    echo -e "\nInclude $HOME/.ssh/config.d/*.conf" >> "$SSH_CONFIG"
-    echo -e "${GREEN}Updated SSH config to include config.d directory.${NC}"
-else
-    echo -e "${GREEN}SSH config already includes config.d directory.${NC}"
-fi
 
 # Set up the service automatically
 echo
