@@ -1,0 +1,16 @@
+[Unit]
+Description=Odoo Developer Tools UI
+After=network.target
+
+[Service]
+User=moh
+Group=moh
+WorkingDirectory=/home/moh/PycharmProjects/OdooDevTools/OdooDeveloperToolsUI
+Environment="PATH=/home/moh/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/home/moh/PycharmProjects/OdooDevTools/OdooDeveloperToolsUI"
+Environment="SSH_AUTH_SOCK=/run/user/1000/ssh-agent.socket"
+ExecStart=/home/moh/.local/bin/gunicorn --workers 1 --bind 127.0.0.1:5000 --timeout 120 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target 
