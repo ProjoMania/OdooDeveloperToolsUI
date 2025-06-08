@@ -77,12 +77,19 @@ setup_systemd_service() {
     INSTALL_DIR="/opt/odoo-developer-tools"
     echo -e "${YELLOW}Installing to $INSTALL_DIR...${NC}"
     
-    # Create the directory and copy files
+    # Create the directory if it doesn't exist
     sudo mkdir -p "$INSTALL_DIR"
-    sudo cp -r "$SCRIPT_DIR/"* "$INSTALL_DIR/"
+    
+    # Remove existing symlink if it exists
+    if [ -L "$INSTALL_DIR" ]; then
+        sudo rm "$INSTALL_DIR"
+    fi
+    
+    # Create symlink from install directory to the repository
+    sudo ln -s "$SCRIPT_DIR" "$INSTALL_DIR"
     sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
     sudo chmod -R 755 "$INSTALL_DIR"
-    echo -e "${GREEN}Files copied to $INSTALL_DIR${NC}"
+    echo -e "${GREEN}Created symlink from $INSTALL_DIR to $SCRIPT_DIR${NC}"
     
     # Update application path
     APP_DIR="$INSTALL_DIR"
@@ -274,6 +281,10 @@ echo
 echo -e "${BLUE}Installing Python packages...${NC}"
 pip3 install -r "$SCRIPT_DIR/requirements.txt"
 
+# Ensure correct cryptography version is installed
+echo -e "${BLUE}Ensuring correct cryptography version...${NC}"
+pip3 install cryptography==39.0.2 --force-reinstall
+
 if [ $? -ne 0 ]; then
     echo -e "${RED}Failed to install Python packages. Please check the error message above.${NC}"
     exit 1
@@ -314,6 +325,73 @@ echo -e "${BLUE}Setting up the application as a system service...${NC}"
 setup_systemd_service
 SERVICE_RESULT=$?
 
+# Function to create update script
+create_update_script() {
+    echo -e "${BLUE}Creating update script...${NC}"
+    
+    UPDATE_SCRIPT="$SCRIPT_DIR/update.sh"
+    cat > "$UPDATE_SCRIPT" << 'EOF'
+#!/bin/bash
+
+# === Colors ===
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}==================================================${NC}"
+echo -e "${BLUE}      Odoo Developer Tools UI Updater             ${NC}"
+echo -e "${BLUE}==================================================${NC}"
+echo
+
+# Get the current directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Stop the service
+echo -e "${YELLOW}Stopping the service...${NC}"
+sudo systemctl stop odoo-developer-tools.service
+
+# Pull latest changes
+echo -e "${YELLOW}Pulling latest changes...${NC}"
+git pull
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to pull latest changes.${NC}"
+    exit 1
+fi
+
+# Install/update Python packages
+echo -e "${YELLOW}Updating Python packages...${NC}"
+pip3 install -r "$SCRIPT_DIR/requirements.txt"
+
+# Ensure correct cryptography version is installed
+echo -e "${BLUE}Ensuring correct cryptography version...${NC}"
+pip3 install cryptography==39.0.2 --force-reinstall
+
+# Restart the service
+echo -e "${YELLOW}Restarting the service...${NC}"
+sudo systemctl daemon-reload
+sudo systemctl start odoo-developer-tools.service
+
+# Check if service started successfully
+if sudo systemctl is-active --quiet odoo-developer-tools.service; then
+    echo -e "${GREEN}Update completed successfully!${NC}"
+    echo -e "${GREEN}The application has been updated and restarted.${NC}"
+    echo -e "${YELLOW}Access the application at: http://127.0.0.1:5000${NC}"
+else
+    echo -e "${RED}Failed to start the service. Check the logs with: sudo journalctl -u odoo-developer-tools.service${NC}"
+    exit 1
+fi
+EOF
+
+    chmod +x "$UPDATE_SCRIPT"
+    echo -e "${GREEN}Update script created at: $UPDATE_SCRIPT${NC}"
+}
+
+# Create update script
+create_update_script
+
 # All done
 echo
 echo -e "${GREEN}=====================================${NC}"
@@ -326,6 +404,7 @@ if [ $SERVICE_RESULT -eq 0 ]; then
     echo -e "  1. By opening a web browser and navigating to ${BLUE}http://127.0.0.1:5000${NC}"
     echo -e "  2. The service will start automatically when your system boots"
     echo -e "  3. To control the service: ${YELLOW}sudo systemctl [start|stop|restart|status] odoo-developer-tools.service${NC}"
+    echo -e "  4. To update the application: ${YELLOW}./update.sh${NC}"
 else
     echo -e "Service setup failed. You can still run the Odoo Developer Tools UI:"
     echo -e "  1. From your desktop applications menu"
