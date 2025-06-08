@@ -105,6 +105,8 @@ setup_systemd_service() {
     SERVICE_CONTENT+="Type=simple\n"
     SERVICE_CONTENT+="User=$CURRENT_USER\n"
     SERVICE_CONTENT+="WorkingDirectory=$APP_DIR\n"
+    SERVICE_CONTENT+="Environment=SSH_AUTH_SOCK=/run/user/$(id -u $CURRENT_USER)/keyring/ssh\n"
+    SERVICE_CONTENT+="Environment=HOME=/home/$CURRENT_USER\n"
     SERVICE_CONTENT+="ExecStart=/usr/bin/python3 $APP_DIR/app.py\n"
     SERVICE_CONTENT+="Restart=on-failure\n"
     SERVICE_CONTENT+="RestartSec=5\n"
