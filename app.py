@@ -1663,13 +1663,6 @@ def generate_subscription_token(user):
     data = f"{user.github_id}:{user.email}:{time.time()}"
     return hashlib.sha256(f"{data}:{secret}".encode()).hexdigest()
 
-# === Premium Feature Routes ===
-@app.route('/premium-features')
-@premium_feature_required
-def premium_features():
-    """Show available premium features"""
-    return render_template('premium_features.html', user=current_user)
-
 @app.route('/odoo/install')
 @premium_required
 def odoo_install():
