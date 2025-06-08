@@ -455,177 +455,32 @@ def generate_ssh_command(host):
 
 @app.route('/servers/connect/<host>', methods=['GET', 'POST'])
 def connect_ssh(host):
-    """Connect to SSH server"""
-    try:
-        # Get server configuration from SSH config
-        config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
-        if not os.path.exists(config_file):
-            flash('Server configuration not found', 'error')
-            return redirect(url_for('ssh_servers'))
-            
-        # Parse SSH config
-        hostname = None
-        user = None
-        port = 22
-        auth_method = 'key'
-        key_file = None
-        password = None
-        
-        with open(config_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('HostName'):
-                    hostname = line.split(' ', 1)[1].strip()
-                elif line.startswith('User'):
-                    user = line.split(' ', 1)[1].strip()
-                elif line.startswith('Port'):
-                    port = int(line.split(' ', 1)[1].strip())
-                elif line.startswith('IdentityFile'):
-                    key_file = line.split(' ', 1)[1].strip()
-                    auth_method = 'key'
-                elif line.startswith('PreferredAuthentications'):
-                    if 'password' in line.lower():
-                        auth_method = 'password'
-                elif line.startswith('# Password:'):
-                    password = line.split(':', 1)[1].strip()
-        
-        if not hostname:
-            flash('Invalid server configuration: HostName not found', 'error')
-            return redirect(url_for('ssh_servers'))
-            
-        if not user:
-            flash('Invalid server configuration: User not found', 'error')
-            return redirect(url_for('ssh_servers'))
-            
-        # Create SSH client
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Connect to server
-        try:
-            print(f"Connecting to {hostname} as {user} using {auth_method} authentication")  # Debug log
-            
-            if auth_method == 'password':
-                if not password:
-                    flash('Password authentication selected but no password found in config', 'error')
-                    return redirect(url_for('ssh_servers'))
-                    
-                print("Attempting password authentication")  # Debug log
-                client.connect(
-                    hostname=hostname,
-                    port=port,
-                    username=user,
-                    password=password,
-                    look_for_keys=False,  # Don't look for keys when using password auth
-                    allow_agent=False     # Don't use SSH agent when using password auth
-                )
-            else:  # key-based auth
-                if not key_file:
-                    flash('Key authentication selected but no key file found in config', 'error')
-                    return redirect(url_for('ssh_servers'))
-                    
-                print(f"Attempting key authentication with key file: {key_file}")  # Debug log
-                
-                # Try to load the key file
-                try:
-                    # First try loading as OpenSSH key
-                    key = paramiko.RSAKey.from_private_key_file(key_file)
-                except Exception as e:
-                    print(f"Failed to load key as OpenSSH format: {str(e)}")  # Debug log
-                    try:
-                        # Try loading as RSA key
-                        key = paramiko.RSAKey.from_private_key_file(key_file, password=None)
-                    except Exception as e:
-                        print(f"Failed to load key as RSA format: {str(e)}")  # Debug log
-                        flash('Failed to load SSH key. Please check the key file format.', 'error')
-                        return redirect(url_for('ssh_servers'))
-                
-                # Connect using the loaded key
-                try:
-                    client.connect(
-                        hostname=hostname,
-                        port=port,
-                        username=user,
-                        pkey=key,
-                        look_for_keys=False,  # Only use the specified key file
-                        allow_agent=False,    # Don't use SSH agent
-                        timeout=10            # Add timeout
-                    )
-                except paramiko.AuthenticationException as e:
-                    print(f"Authentication failed with key: {str(e)}")  # Debug log
-                    # Try connecting with system SSH agent as fallback
-                    try:
-                        print("Trying to connect using system SSH agent...")  # Debug log
-                        client.connect(
-                            hostname=hostname,
-                            port=port,
-                            username=user,
-                            look_for_keys=True,  # Look for keys in default locations
-                            allow_agent=True,    # Use SSH agent
-                            timeout=10
-                        )
-                    except Exception as e:
-                        print(f"Failed to connect using SSH agent: {str(e)}")  # Debug log
-                        # Try using system SSH command as last resort
-                        try:
-                            print("Trying to connect using system SSH command...")  # Debug log
-                            # Create a temporary script to test SSH connection
-                            script_path = os.path.join(tempfile.gettempdir(), f"ssh_test_{host}.sh")
-                            with open(script_path, 'w') as f:
-                                f.write(f"""#!/bin/bash
-ssh -F ~/.ssh/config {host} 'echo "Connection successful"'
-""")
-                            os.chmod(script_path, 0o755)
-                            
-                            # Run the script
-                            result = subprocess.run([script_path], capture_output=True, text=True)
-                            if result.returncode == 0:
-                                # If SSH command works, create a new SSH client
-                                client = paramiko.SSHClient()
-                                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                                client.connect(
-                                    hostname=hostname,
-                                    port=port,
-                                    username=user,
-                                    look_for_keys=True,
-                                    allow_agent=True,
-                                    timeout=10
-                                )
-                            else:
-                                print(f"SSH command failed: {result.stderr}")  # Debug log
-                                raise Exception("SSH command failed")
-                        except Exception as e:
-                            print(f"Failed to connect using SSH command: {str(e)}")  # Debug log
-                            raise
-                
-            # Create session
-            session_id = str(uuid.uuid4())
-            active_sessions[session_id] = {
-                'client': client,
-                'host': host,
-                'start_time': datetime.now()
-            }
-            
-            flash(f'Successfully connected to {host}', 'success')
-            return redirect(url_for('ssh_terminal_page', host=host))
-            
-        except paramiko.AuthenticationException as e:
-            print(f"Authentication failed: {str(e)}")  # Debug log
-            flash('Authentication failed. Please check your credentials.', 'error')
-            return redirect(url_for('ssh_servers'))
-        except paramiko.SSHException as e:
-            print(f"SSH error: {str(e)}")  # Debug log
-            flash(f'SSH error: {str(e)}', 'error')
-            return redirect(url_for('ssh_servers'))
-        except Exception as e:
-            print(f"Connection error: {str(e)}")  # Debug log
-            flash(f'Error connecting to SSH: {str(e)}', 'error')
-            return redirect(url_for('ssh_servers'))
-            
-    except Exception as e:
-        print(f"General error: {str(e)}")  # Debug log
-        flash(f'Error: {str(e)}', 'error')
+    """Connect to SSH server using system ssh command only"""
+    import subprocess
+    import os
+    # Parse config as before
+    config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+    if not os.path.exists(config_file):
+        flash('Server configuration not found', 'error')
         return redirect(url_for('ssh_servers'))
+    
+    # Optionally parse config for display, but not needed for connection
+    ssh_config = os.path.expanduser('~/.ssh/config')
+    ssh_cmd = [
+        'ssh',
+        '-F', ssh_config,
+        host,
+        'echo "Connection successful"'
+    ]
+    try:
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            flash(f'Successfully connected to {host}', 'success')
+        else:
+            flash(f'Failed to connect: {result.stderr}', 'danger')
+    except Exception as e:
+        flash(f'Error connecting to SSH: {str(e)}', 'danger')
+    return redirect(url_for('ssh_servers'))
 
 @app.route('/servers/<host>/details')
 @premium_required
@@ -1934,38 +1789,18 @@ if __name__ == '__main__':
     
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='Odoo Developer Tools UI')
-    parser.add_argument('--port', type=int, default=5000, help='Port to run the server on')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the server on')
     args = parser.parse_args()
     
-    # Create database tables before running the app
+    # Set up logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create database tables
     with app.app_context():
         db.create_all()
-        
-        # Initialize default settings if none exist
-        if Setting.query.count() == 0:
-            # Use the reset_settings function logic without the redirect
-            default_settings = [
-                # PostgreSQL settings
-                ('postgres_user', 'postgres', 'Default PostgreSQL username'),
-                ('postgres_password', '', 'PostgreSQL password (empty for peer authentication)'),
-                ('postgres_host', '127.0.0.1', 'PostgreSQL server hostname'),
-                ('postgres_port', '5432', 'PostgreSQL server port'),
-                
-                # File paths
-                ('filestore_dir', FILESTORE_DIR, 'Directory where Odoo filestore folders are stored'),
-                ('upload_folder', app.config['UPLOAD_FOLDER'], 'Temporary directory for file uploads'),
-                ('ssh_config_dir', SSH_CONFIG_DIR, 'Directory for SSH configuration files'),
-                
-                # Application settings
-                ('default_odoo_version', '17.0', 'Default Odoo version for new projects'),
-                ('auto_backup_before_drop', 'true', 'Create a backup before dropping a database'),
-                ('dark_mode', 'false', 'Use dark theme for the application')
-            ]
-            
-            for key, value, description in default_settings:
-                setting = Setting(key=key, value=value, description=description)
-                db.session.add(setting)
-            
-            db.session.commit()
+        print("Database tables created successfully")
     
     app.run(debug=True, port=args.port)
