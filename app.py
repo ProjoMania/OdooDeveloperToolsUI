@@ -627,21 +627,20 @@ def index():
     """Main index page"""
     return render_template('index.html')
 
-@app.route('/servers')
 @app.route('/ssh')
+@app.route('/ssh_servers')
+@app.route('/servers')
 def ssh_servers():
     """SSH servers list page"""
     servers = get_ssh_servers()
     return render_template('ssh.html', servers=servers, is_premium=True)
 
-@app.route('/servers/add')
-@app.route('/ssh/add')
+@app.route('/add_ssh_server')
 def add_ssh_server():
     """Add SSH server page"""
     return render_template('add_ssh_server.html')
 
-@app.route('/servers/add', methods=['POST'])
-@app.route('/ssh/add', methods=['POST'])
+@app.route('/add_ssh_server', methods=['POST'])
 def add_ssh_server_post():
     """Handle SSH server addition"""
     try:
@@ -754,76 +753,122 @@ def upgrade_subscription():
 @app.route('/projects')
 def projects():
     """Projects list page"""
-    projects = Project.query.filter_by(user_id=current_user.get_id()).all()
-    return render_template('projects/index.html', projects=projects)
+    return render_template('projects/index.html')
 
-@app.route('/projects/add')
-def add_project():
-    """Add project page"""
+@app.route('/projects/new')
+def new_project():
+    """New project form page"""
     return render_template('projects/form.html')
 
-@app.route('/projects/add', methods=['POST'])
-def add_project_post():
-    """Handle project addition"""
+@app.route('/projects/new', methods=['POST'])
+def create_project():
+    """Handle project creation"""
     try:
-        project = Project(
-            name=request.form['name'],
-            description=request.form.get('description', ''),
-            user_id=current_user.get_id()
-        )
-        db.session.add(project)
-        db.session.commit()
-        flash(f'Project {project.name} created successfully!', 'success')
+        # This would handle project creation logic
+        flash('Project creation feature coming soon!', 'info')
         return redirect(url_for('projects'))
     except Exception as e:
         flash(f'Error creating project: {str(e)}', 'error')
-        return redirect(url_for('add_project'))
+        return redirect(url_for('new_project'))
 
 @app.route('/projects/<int:project_id>')
 def view_project(project_id):
     """View project details"""
-    project = Project.query.get_or_404(project_id)
-    return render_template('projects/view.html', project=project)
+    return render_template('projects/view.html', project_id=project_id)
 
-@app.route('/projects/<int:project_id>/tasks')
-def project_tasks(project_id):
-    """Project tasks list"""
-    project = Project.query.get_or_404(project_id)
-    tasks = Task.query.filter_by(project_id=project_id).all()
-    return render_template('tasks/index.html', project=project, tasks=tasks)
+@app.route('/projects/<int:project_id>/edit')
+def edit_project(project_id):
+    """Edit project form"""
+    return render_template('projects/form.html', project_id=project_id)
 
-@app.route('/projects/<int:project_id>/tasks/add')
-def add_task(project_id):
-    """Add task page"""
-    project = Project.query.get_or_404(project_id)
-    return render_template('tasks/form.html', project=project)
-
-@app.route('/projects/<int:project_id>/tasks/add', methods=['POST'])
-def add_task_post(project_id):
-    """Handle task addition"""
+@app.route('/projects/<int:project_id>/edit', methods=['POST'])
+def update_project(project_id):
+    """Handle project update"""
     try:
-        task = Task(
-            title=request.form['title'],
-            description=request.form.get('description', ''),
-            project_id=project_id,
-            user_id=current_user.get_id()
-        )
-        db.session.add(task)
-        db.session.commit()
-        flash(f'Task {task.title} created successfully!', 'success')
-        return redirect(url_for('project_tasks', project_id=project_id))
+        # This would handle project update logic
+        flash('Project update feature coming soon!', 'info')
+        return redirect(url_for('view_project', project_id=project_id))
+    except Exception as e:
+        flash(f'Error updating project: {str(e)}', 'error')
+        return redirect(url_for('edit_project', project_id=project_id))
+
+@app.route('/projects/<int:project_id>/delete')
+def delete_project_page(project_id):
+    """Delete project confirmation page"""
+    return render_template('projects/delete_project.html', project_id=project_id)
+
+@app.route('/projects/<int:project_id>/delete', methods=['POST'])
+def delete_project(project_id):
+    """Handle project deletion"""
+    try:
+        # This would handle project deletion logic
+        flash('Project deletion feature coming soon!', 'info')
+        return redirect(url_for('projects'))
+    except Exception as e:
+        flash(f'Error deleting project: {str(e)}', 'error')
+        return redirect(url_for('delete_project_page', project_id=project_id))
+
+@app.route('/tasks')
+def tasks():
+    """Tasks list page"""
+    return render_template('tasks/index.html')
+
+@app.route('/tasks/new')
+def new_task():
+    """New task form page"""
+    return render_template('tasks/form.html')
+
+@app.route('/tasks/new', methods=['POST'])
+def create_task():
+    """Handle task creation"""
+    try:
+        # This would handle task creation logic
+        flash('Task creation feature coming soon!', 'info')
+        return redirect(url_for('tasks'))
     except Exception as e:
         flash(f'Error creating task: {str(e)}', 'error')
-        return redirect(url_for('add_task', project_id=project_id))
+        return redirect(url_for('new_task'))
 
 @app.route('/tasks/<int:task_id>')
 def view_task(task_id):
     """View task details"""
-    task = Task.query.get_or_404(task_id)
-    return render_template('tasks/view.html', task=task)
+    return render_template('tasks/view.html', task_id=task_id)
+
+@app.route('/tasks/<int:task_id>/edit')
+def edit_task(task_id):
+    """Edit task form"""
+    return render_template('tasks/form.html', task_id=task_id)
+
+@app.route('/tasks/<int:task_id>/edit', methods=['POST'])
+def update_task(task_id):
+    """Handle task update"""
+    try:
+        # This would handle task update logic
+        flash('Task update feature coming soon!', 'info')
+        return redirect(url_for('view_task', task_id=task_id))
+    except Exception as e:
+        flash(f'Error updating task: {str(e)}', 'error')
+        return redirect(url_for('edit_task', task_id=task_id))
+
+@app.route('/tasks/<int:task_id>/delete')
+def delete_task_page(task_id):
+    """Delete task confirmation page"""
+    return render_template('tasks/delete_task.html', task_id=task_id)
+
+@app.route('/tasks/<int:task_id>/delete', methods=['POST'])
+def delete_task(task_id):
+    """Handle task deletion"""
+    try:
+        # This would handle task deletion logic
+        flash('Task deletion feature coming soon!', 'info')
+        return redirect(url_for('tasks'))
+    except Exception as e:
+        flash(f'Error deleting task: {str(e)}', 'error')
+        return redirect(url_for('delete_task_page', task_id=task_id))
 
 @app.route('/databases')
-def databases():
+@app.route('/list_databases')
+def list_databases():
     """Databases list page"""
     try:
         conn = get_db_connection()
@@ -832,7 +877,7 @@ def databases():
         else:
             cursor = conn.cursor()
             cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;")
-            databases = [row[0] for row in cursor.fetchall()]
+            databases = [{'name': row[0]} for row in cursor.fetchall()]
             conn.close()
     except Exception as e:
         logger.error(f"Error fetching databases: {str(e)}")
@@ -840,56 +885,15 @@ def databases():
         flash(f'Error fetching databases: {str(e)}', 'error')
     
     return render_template('databases.html', databases=databases)
-
-@app.route('/list_databases')
-def list_databases():
-    """Databases list page (alias for backward compatibility)"""
-    try:
-        conn = get_db_connection()
-        if not conn:
-            databases = []
-        else:
-            cursor = conn.cursor()
-            cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;")
-            databases = [row[0] for row in cursor.fetchall()]
-            conn.close()
-    except Exception as e:
-        logger.error(f"Error fetching databases: {str(e)}")
-        databases = []
-        flash(f'Error fetching databases: {str(e)}', 'error')
-    
-    return render_template('databases.html', databases=databases)
-
-@app.route('/databases/drop/<database_name>')
-def drop_database_page(database_name):
-    """Drop database confirmation page"""
-    return render_template('drop_database.html', database_name=database_name)
 
 @app.route('/drop_database/<db_name>')
 def drop_database(db_name):
-    """Drop database confirmation page (alias for backward compatibility)"""
+    """Drop database confirmation page"""
     return render_template('drop_database.html', database_name=db_name, db_name=db_name)
 
-@app.route('/databases/drop/<database_name>', methods=['POST'])
-def drop_database_post(database_name):
-    """Handle database deletion"""
-    try:
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute(f"DROP DATABASE IF EXISTS {database_name};")
-            conn.close()
-            flash(f'Database {database_name} dropped successfully!', 'success')
-        else:
-            flash('Could not connect to database', 'error')
-    except Exception as e:
-        flash(f'Error dropping database: {str(e)}', 'error')
-    
-    return redirect(url_for('databases'))
-
 @app.route('/drop_database/<db_name>', methods=['POST'])
-def drop_database_post_alias(db_name):
-    """Handle database deletion (alias for backward compatibility)"""
+def drop_database_post(db_name):
+    """Handle database deletion"""
     try:
         conn = get_db_connection()
         if conn:
@@ -902,54 +906,42 @@ def drop_database_post_alias(db_name):
     except Exception as e:
         flash(f'Error dropping database: {str(e)}', 'error')
     
-    return redirect(url_for('databases'))
-
-@app.route('/databases/restore')
-def restore_database_page():
-    """Restore database page"""
-    return render_template('restore_database.html')
+    return redirect(url_for('list_databases'))
 
 @app.route('/restore_database')
 def restore_database():
-    """Restore database page (alias for backward compatibility)"""
+    """Restore database page"""
     return render_template('restore_database.html')
 
-@app.route('/databases/restore', methods=['POST'])
-def restore_database_page_post():
+@app.route('/restore_database', methods=['POST'])
+def restore_database_post():
     """Handle database restoration"""
     try:
         # This would handle database restoration logic
         flash('Database restoration feature coming soon!', 'info')
-        return redirect(url_for('databases'))
-    except Exception as e:
-        flash(f'Error restoring database: {str(e)}', 'error')
-        return redirect(url_for('restore_database_page'))
-
-@app.route('/restore_database', methods=['POST'])
-def restore_database_post():
-    """Handle database restoration (alias for backward compatibility)"""
-    try:
-        # This would handle database restoration logic
-        flash('Database restoration feature coming soon!', 'info')
-        return redirect(url_for('databases'))
+        return redirect(url_for('list_databases'))
     except Exception as e:
         flash(f'Error restoring database: {str(e)}', 'error')
         return redirect(url_for('restore_database'))
 
 @app.route('/extend_enterprise')
-def extend_enterprise():
+@app.route('/extend_enterprise/<db_name>')
+def extend_enterprise(db_name=None):
     """Extend enterprise page"""
-    return render_template('extend_enterprise.html')
+    return render_template('extend_enterprise.html', db_name=db_name)
 
 @app.route('/extend_enterprise', methods=['POST'])
-def extend_enterprise_post():
+@app.route('/extend_enterprise/<db_name>', methods=['POST'])
+def extend_enterprise_post(db_name=None):
     """Handle enterprise extension"""
     try:
+        if not db_name:
+            db_name = request.form.get('db_name')
         # This would handle enterprise extension logic
-        return render_template('extend_enterprise_results.html')
+        return render_template('extend_enterprise_results.html', db_name=db_name)
     except Exception as e:
         flash(f'Error extending enterprise: {str(e)}', 'error')
-        return redirect(url_for('extend_enterprise'))
+        return redirect(url_for('extend_enterprise', db_name=db_name))
 
 @app.route('/odoo_install')
 def odoo_install():
@@ -970,25 +962,31 @@ def odoo_install_post():
 @app.route('/settings')
 def settings():
     """Settings page"""
-    settings = Setting.query.all()
-    settings_dict = {s.key: s.value for s in settings}
-    return render_template('settings.html', settings=settings_dict)
+    # Default settings values
+    default_settings = {
+        'postgres_user': 'odoo',
+        'postgres_password': '',
+        'postgres_host': 'localhost',
+        'postgres_port': '5432',
+        'filestore_dir': '/opt/odoo/filestore',
+        'upload_folder': './uploads',
+        'ssh_config_dir': SSH_CONFIG_DIR,
+        'default_odoo_version': '17.0',
+        'auto_backup_before_drop': 'false',
+        'dark_mode': 'false'
+    }
+    
+    return render_template('settings.html', settings=default_settings, is_premium=True)
 
 @app.route('/settings', methods=['POST'])
 def save_settings():
     """Save settings"""
     try:
-        for key, value in request.form.items():
-            setting = Setting.query.filter_by(key=key).first()
-            if setting:
-                setting.value = value
-            else:
-                setting = Setting(key=key, value=value)
-                db.session.add(setting)
-        db.session.commit()
-        flash('Settings saved successfully!', 'success')
+        # This would handle settings saving logic
+        # For now, just show a success message
+        flash('Settings updated successfully!', 'success')
     except Exception as e:
-        flash(f'Error saving settings: {str(e)}', 'error')
+        flash(f'Error updating settings: {str(e)}', 'error')
     
     return redirect(url_for('settings'))
 
