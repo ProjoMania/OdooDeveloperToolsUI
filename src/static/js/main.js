@@ -122,72 +122,11 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const host = this.getAttribute('data-host');
             const button = this;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Connecting...';
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Opening Terminal...';
             button.disabled = true;
             
-            fetch(`/servers/generate_command/${host}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.command) {
-                        const command = data.command;
-                        // Create a form to submit the command as POST
-                        const form = document.createElement('form');
-                        form.method = 'post';
-                        form.action = `/servers/connect/${host}`;
-                        form.style.display = 'none';
-                        
-                        // Add the command
-                        const commandInput = document.createElement('input');
-                        commandInput.type = 'hidden';
-                        commandInput.name = 'command';
-                        commandInput.value = command;
-                        form.appendChild(commandInput);
-                        
-                        // Add server information for enhanced UI
-                        const serverHostInput = document.createElement('input');
-                        serverHostInput.type = 'hidden';
-                        serverHostInput.name = 'server_host';
-                        serverHostInput.value = data.host || host;
-                        form.appendChild(serverHostInput);
-                        
-                        const authTypeInput = document.createElement('input');
-                        authTypeInput.type = 'hidden';
-                        authTypeInput.name = 'auth_type';
-                        authTypeInput.value = data.auth_type || 'key';
-                        form.appendChild(authTypeInput);
-                        
-                        if (data.user) {
-                            const userInput = document.createElement('input');
-                            userInput.type = 'hidden';
-                            userInput.name = 'user';
-                            userInput.value = data.user;
-                            form.appendChild(userInput);
-                        }
-                        
-                        if (data.hostname) {
-                            const hostnameInput = document.createElement('input');
-                            hostnameInput.type = 'hidden';
-                            hostnameInput.name = 'hostname';
-                            hostnameInput.value = data.hostname;
-                            form.appendChild(hostnameInput);
-                        }
-                        
-                        document.body.appendChild(form);
-                        form.submit();
-                    } else {
-                        // Reset button if error
-                        button.innerHTML = '<i class="fas fa-terminal me-1"></i> Connect';
-                        button.disabled = false;
-                        alert('Error connecting to SSH server: ' + (data.error || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    // Reset button if error
-                    button.innerHTML = '<i class="fas fa-terminal me-1"></i> Connect';
-                    button.disabled = false;
-                    console.error('Error:', error);
-                    alert('Error connecting to SSH server');
-                });
+            // Redirect directly to the SSH terminal page
+            window.location.href = `/terminal/ssh/${host}`;
         });
     });
     

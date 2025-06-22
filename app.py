@@ -448,49 +448,40 @@ def generate_ssh_command(host):
 
 @app.route('/servers/connect/<host>', methods=['GET', 'POST'])
 def connect_ssh(host):
-    """Connect to SSH server using system ssh command only"""
-    import subprocess
-    import os
+    """Redirect to SSH terminal page"""
+    servers = get_ssh_servers()
     
-    # Parse config as before
-    config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
-    if not os.path.exists(config_file):
+    # Find the server with matching host
+    server = None
+    for s in servers:
+        if s.get('host') == host:
+            server = s
+            break
+    
+    if not server:
         flash('Server configuration not found', 'error')
         return redirect(url_for('ssh_servers'))
     
-    # Get SSH_AUTH_SOCK from environment or use default
-    ssh_auth_sock = os.environ.get('SSH_AUTH_SOCK', '/run/user/{}/keyring/ssh'.format(os.getuid()))
+    # Redirect to terminal page
+    return redirect(url_for('ssh_terminal_page', host=host))
+
+@app.route('/terminal/ssh/<host>')
+def ssh_terminal_page(host):
+    """SSH terminal page"""
+    servers = get_ssh_servers()
     
-    # Set up environment for SSH command
-    env = os.environ.copy()
-    env['SSH_AUTH_SOCK'] = ssh_auth_sock
+    # Find the server with matching host
+    server = None
+    for s in servers:
+        if s.get('host') == host:
+            server = s
+            break
     
-    # Optionally parse config for display, but not needed for connection
-    ssh_config = os.path.expanduser('~/.ssh/config')
-    ssh_cmd = [
-        'ssh',
-        '-F', ssh_config,
-        host,
-        'echo "Connection successful"'
-    ]
+    if not server:
+        flash('Server configuration not found', 'error')
+        return redirect(url_for('ssh_servers'))
     
-    try:
-        # Run SSH command with the correct environment
-        result = subprocess.run(
-            ssh_cmd,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            env=env
-        )
-        
-        if result.returncode == 0:
-            flash(f'Successfully connected to {host}', 'success')
-        else:
-            flash(f'Failed to connect: {result.stderr}', 'danger')
-    except Exception as e:
-        flash(f'Error connecting to SSH: {str(e)}', 'danger')
-    return redirect(url_for('ssh_servers'))
+    return render_template('ssh_terminal.html', host=host, server=server)
 
 @app.route('/servers/<host>/details')
 @premium_required
@@ -1673,9 +1664,19 @@ def odoo_install():
 @sock.route('/ws/ssh/<host>')
 def ssh_terminal(ws, host):
     """WebSocket endpoint for SSH terminal"""
+    ssh = None
+    channel = None
+    session_id = None
+    
     try:
-        # Get server details
-        server = SSHServer.query.filter_by(host=host).first()
+        # Get server details from config files instead of database
+        servers = get_ssh_servers()
+        server = None
+        for s in servers:
+            if s.get('host') == host:
+                server = s
+                break
+        
         if not server:
             ws.send(json.dumps({'type': 'error', 'message': 'Server not found'}))
             return
@@ -1684,17 +1685,58 @@ def ssh_terminal(ws, host):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        # Connect to server
-        ssh.connect(
-            hostname=server.host,
-            port=server.port,
-            username=server.username,
-            password=server.password if server.auth_type == 'password' else None,
-            key_filename=server.key_path if server.auth_type == 'key' else None
-        )
+        # Connect to server using config details
+        hostname = server.get('hostname', host)
+        username = server.get('user') or os.getenv('USER', 'root')
+        port = int(server.get('port', 22))
+        
+        # Determine authentication method
+        if server.get('key_file'):
+            # Key-based authentication
+            key_path = os.path.expanduser(server['key_file'])
+            if not os.path.exists(key_path):
+                ws.send(json.dumps({'type': 'error', 'message': f'SSH key file not found: {key_path}'}))
+                return
+            
+            ssh.connect(
+                hostname=hostname,
+                port=port,
+                username=username,
+                key_filename=key_path,
+                timeout=30,
+                look_for_keys=False
+            )
+        else:
+            # Password authentication - get password from config comment (not recommended in production)
+            config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+            password = None
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    content = f.read()
+                    for line in content.splitlines():
+                        if line.strip().startswith('# Password: '):
+                            password = line.strip().replace('# Password: ', '')
+                            break
+            
+            if not password:
+                # Try environment variable as fallback
+                password = os.getenv(f'SSH_PASSWORD_{host.upper()}') or os.getenv('SSH_PASSWORD', '')
+            
+            if not password:
+                ws.send(json.dumps({'type': 'error', 'message': f'No password found for authentication. Set SSH_PASSWORD environment variable or configure key-based auth.'}))
+                return
+            
+            ssh.connect(
+                hostname=hostname,
+                port=port,
+                username=username,
+                password=password,
+                timeout=30,
+                look_for_keys=False
+            )
         
         # Create interactive shell
-        channel = ssh.invoke_shell()
+        channel = ssh.invoke_shell(term='xterm-256color', width=80, height=24)
         channel.settimeout(0.1)
         
         # Store session
@@ -1708,20 +1750,26 @@ def ssh_terminal(ws, host):
         # Send initial connection success
         ws.send(json.dumps({
             'type': 'connected',
-            'message': f'Connected to {server.host}'
+            'message': f'Connected to {hostname} ({host}) as {username}'
         }))
         
         # Main terminal loop
         while True:
             try:
                 # Check for incoming WebSocket messages
-                message = ws.receive()
+                message = ws.receive(timeout=0.1)
                 if message:
                     data = json.loads(message)
                     if data['type'] == 'input':
                         channel.send(data['data'])
+                        # Update last activity
+                        if session_id in active_sessions:
+                            active_sessions[session_id]['last_activity'] = datetime.now()
                     elif data['type'] == 'resize':
-                        channel.get_pty(term='xterm', width=data['cols'], height=data['rows'])
+                        try:
+                            channel.resize_pty(width=data['cols'], height=data['rows'])
+                        except Exception as resize_error:
+                            logger.warning(f"Failed to resize terminal: {resize_error}")
                 
                 # Check for incoming SSH data
                 if channel.recv_ready():
@@ -1735,34 +1783,70 @@ def ssh_terminal(ws, host):
                 if channel.recv_stderr_ready():
                     error = channel.recv_stderr(4096).decode('utf-8', errors='ignore')
                     ws.send(json.dumps({
-                        'type': 'error',
+                        'type': 'output',
                         'data': error
                     }))
                 
                 # Check if channel is closed
                 if channel.exit_status_ready():
+                    exit_status = channel.recv_exit_status()
+                    ws.send(json.dumps({
+                        'type': 'disconnected',
+                        'message': f'SSH session ended with exit status {exit_status}'
+                    }))
                     break
                     
             except Exception as e:
-                ws.send(json.dumps({
-                    'type': 'error',
-                    'message': str(e)
-                }))
-                break
+                error_str = str(e).lower()
+                if "timed out" not in error_str and "timeout" not in error_str:
+                    logger.error(f"SSH terminal loop error: {e}")
+                    ws.send(json.dumps({
+                        'type': 'error',
+                        'message': f'Terminal error: {str(e)}'
+                    }))
+                    break
                 
-    except Exception as e:
+    except paramiko.AuthenticationException as e:
         ws.send(json.dumps({
             'type': 'error',
-            'message': str(e)
+            'message': f'Authentication failed: {str(e)}'
+        }))
+    except paramiko.SSHException as e:
+        ws.send(json.dumps({
+            'type': 'error',
+            'message': f'SSH connection failed: {str(e)}'
+        }))
+    except Exception as e:
+        logger.error(f"SSH terminal connection error: {e}")
+        ws.send(json.dumps({
+            'type': 'error',
+            'message': f'Connection failed: {str(e)}'
         }))
     finally:
         # Clean up
-        if 'session_id' in locals():
-            if session_id in active_sessions:
+        if session_id and session_id in active_sessions:
+            try:
                 session = active_sessions[session_id]
-                session['channel'].close()
-                session['ssh'].close()
+                if session.get('channel'):
+                    session['channel'].close()
+                if session.get('ssh'):
+                    session['ssh'].close()
+            except Exception as cleanup_error:
+                logger.warning(f"Error during cleanup: {cleanup_error}")
+            finally:
                 del active_sessions[session_id]
+        
+        # Also clean up local variables
+        if channel:
+            try:
+                channel.close()
+            except:
+                pass
+        if ssh:
+            try:
+                ssh.close()
+            except:
+                pass
 
 
 # === Run the Application ===
