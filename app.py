@@ -31,6 +31,9 @@ class MockUser:
     is_anonymous = False
     github_id = "local-dev"
     email = "local@example.com"
+    has_active_subscription = True
+    subscription_tier = "premium"
+    subscription_expires_at = None
     
     def get_id(self):
         return "local-user"
@@ -976,7 +979,10 @@ def settings():
         'dark_mode': 'false'
     }
     
-    return render_template('settings.html', settings=default_settings, is_premium=True)
+    return render_template('settings.html', 
+                         settings=default_settings, 
+                         is_premium=True, 
+                         current_user=current_user)
 
 @app.route('/settings', methods=['POST'])
 def save_settings():
