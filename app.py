@@ -540,7 +540,7 @@ def add_ssh_server_post():
     """Handle SSH server addition"""
     try:
         host = request.form['host']
-        hostname = host  # Use host as hostname for simplicity
+        hostname = request.form['hostname']  # Get actual hostname/IP from form
         username = request.form['username']
         port = request.form.get('port', '22')
         auth_type = request.form.get('auth_type', 'password')
