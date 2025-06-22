@@ -25,7 +25,6 @@ The original implementation faced authentication issues with Paramiko:
 #### Flask Routes
 - **`/servers/connect/<host>`**: Redirects to SSH terminal page
 - **`/terminal/ssh/<host>`**: Serves the SSH terminal page
-- **`/api/test_ssh/<host>`**: Tests SSH connection and provides debugging info
 
 #### WebSocket Handler
 - **`/ws/ssh/<host>`**: Handles real-time terminal communication
@@ -37,7 +36,6 @@ The original implementation faced authentication issues with Paramiko:
 
 #### SSH Servers Page (`ssh.html`)
 - Lists configured SSH servers
-- **Test Connection** button with detailed debugging modal
 - **Connect** button to open terminal
 - Search and filter functionality
 
@@ -49,7 +47,6 @@ The original implementation faced authentication issues with Paramiko:
 
 #### JavaScript Components
 - **Terminal.js**: xterm.js integration and WebSocket communication
-- **Connection testing**: Detailed debug information modal
 - **Real-time data handling**: Input/output streaming
 
 ## Technical Implementation
@@ -74,16 +71,7 @@ proc = subprocess.Popen(['ssh', '-t', host],
 # Remote Server → SSH → PTY → WebSocket → Browser
 ```
 
-### Connection Testing
-```javascript
-// Test SSH connection before opening terminal
-GET /api/test_ssh/<host>
-// Returns detailed debugging information:
-// - SSH agent status and key fingerprints
-// - Authentication methods tried
-// - Connection success/failure details
-// - Troubleshooting suggestions
-```
+
 
 ## Configuration
 
@@ -108,24 +96,13 @@ Host ServerName
 2. Fill in server details (host, IP, user, port, key file)
 3. Configuration is saved to `~/.ssh/config.d/`
 
-### 2. Test Connection
-1. Click **"Test"** button next to any server
-2. View detailed debugging information
-3. Troubleshoot any authentication issues
-
-### 3. Connect via Terminal
+### 2. Connect via Terminal
 1. Click **"Connect"** button
 2. New terminal page opens
 3. Interactive shell session begins
 4. Full terminal functionality available
 
 ## Debugging Features
-
-### Connection Test Modal
-- **Authentication Methods**: Shows all methods tried and results
-- **SSH Agent Status**: Key count and fingerprints
-- **Error Details**: Specific error messages and troubleshooting tips
-- **Success Indicators**: Confirms working authentication method
 
 ### Terminal Status
 - **Connection Status**: Real-time connection state
@@ -170,11 +147,9 @@ Host ServerName
 - **Verify**: SSH session not hung on remote server
 
 ### Debug Steps
-1. Use **"Test Connection"** button first
-2. Check detailed error messages in test modal
-3. Verify SSH connection works from command line
-4. Check browser console for WebSocket errors
-5. Review Flask application logs
+1. Verify SSH connection works from command line
+2. Check browser console for WebSocket errors
+3. Review Flask application logs
 
 ## Performance Considerations
 
@@ -213,8 +188,7 @@ Host ServerName
 ## Quick Start
 1. Ensure SSH works from command line: `ssh <your-server>`
 2. Add server via web interface
-3. Use **"Test"** button to verify connection
-4. Click **"Connect"** to open terminal
-5. Enjoy full SSH terminal experience in your browser!
+3. Click **"Connect"** to open terminal
+4. Enjoy full SSH terminal experience in your browser!
 
 **Note**: This implementation bypasses Paramiko authentication issues by using the system SSH client, ensuring 100% compatibility with your existing SSH setup. 
