@@ -45,7 +45,7 @@
                     </li>
                 </ul>
                 
-                <form id="delete-ssh-server-form" method="post" action="{{ url_for('delete_ssh_server', host=server.host) }}" class="mt-4">
+                <form id="delete-ssh-server-form" method="post" action="{{ url_for('delete_ssh_server_post', host=server.host) }}" class="mt-4">
                     <div class="d-flex justify-content-between mt-5">
                         <a href="{{ url_for('ssh_servers') }}" class="btn btn-outline-dark btn-lg">
                             <i class="fas fa-arrow-left me-2"></i> Cancel

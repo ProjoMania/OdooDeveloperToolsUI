@@ -46,7 +46,7 @@
                                 <th>IP/Domain</th>
                                 <th>User</th>
                                 <th>Port</th>
-                                <th>Key File</th>
+                                <th>Authentication</th>
                                 <th class="text-center">Actions</th>
                             </tr>
                         </thead>
@@ -57,8 +57,20 @@
                                 <td>{{ server.hostname }}</td>
                                 <td>{{ server.user }}</td>
                                 <td>{{ server.port }}</td>
-                                <td class="text-truncate" style="max-width: 200px;" title="{{ server.key_file }}">
-                                    {{ server.key_file }}
+                                <td>
+                                    {% if server.password %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-key me-1"></i>Password
+                                        </span>
+                                    {% elif server.key_file %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-certificate me-1"></i>SSH Key
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-certificate me-1"></i>Default Key
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-primary copy-ssh-command"

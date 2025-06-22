@@ -624,7 +624,18 @@ def ssh_terminal_page(host):
 @app.route('/servers/delete/<host>')
 def delete_ssh_server(host):
     """Delete SSH server page"""
-    return render_template('delete_ssh_server.html', host=host)
+    servers = get_ssh_servers()
+    server = None
+    for s in servers:
+        if s.get('host') == host:
+            server = s
+            break
+    
+    if not server:
+        flash('Server configuration not found', 'error')
+        return redirect(url_for('ssh_servers'))
+    
+    return render_template('delete_ssh_server.html', host=host, server=server)
 
 @app.route('/servers/delete/<host>', methods=['POST'])
 def delete_ssh_server_post(host):
