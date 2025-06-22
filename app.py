@@ -613,6 +613,52 @@ def ssh_server_details(host):
     
     return render_template('ssh_server_details.html', server=server, host=host)
 
+@app.route('/servers/generate_command/<host>')
+def generate_ssh_command(host):
+    """Generate SSH command for copying to clipboard"""
+    try:
+        servers = get_ssh_servers()
+        server = None
+        for s in servers:
+            if s.get('host') == host:
+                server = s
+                break
+        
+        if not server:
+            return jsonify({'error': 'Server not found'}), 404
+        
+        # Build SSH command
+        hostname = server.get('hostname', host)
+        username = server.get('user')
+        port = server.get('port', '22')
+        key_file = server.get('key_file')
+        
+        # Start with basic command
+        command_parts = ['ssh']
+        
+        # Add port if not default
+        if port and port != '22':
+            command_parts.extend(['-p', port])
+        
+        # Add key file if specified
+        if key_file:
+            command_parts.extend(['-i', key_file])
+        
+        # Add user@hostname or just hostname
+        if username:
+            command_parts.append(f"{username}@{hostname}")
+        else:
+            command_parts.append(hostname)
+        
+        # Join command parts
+        ssh_command = ' '.join(command_parts)
+        
+        return jsonify({'command': ssh_command})
+        
+    except Exception as e:
+        logger.error(f"Error generating SSH command for {host}: {str(e)}")
+        return jsonify({'error': 'Failed to generate SSH command'}), 500
+
 @app.route('/upgrade')
 def upgrade_subscription():
     """Upgrade subscription page (placeholder)"""
