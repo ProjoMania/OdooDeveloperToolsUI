@@ -67,6 +67,12 @@
                                             title="Copy SSH Command">
                                         <i class="fas fa-copy"></i> Copy
                                     </button>
+                                    <button class="btn btn-sm btn-outline-info test-ssh-connection"
+                                            data-host="{{ server.host }}"
+                                            data-bs-toggle="tooltip" 
+                                            title="Test SSH Connection">
+                                        <i class="fas fa-vial"></i> Test
+                                    </button>
                                     <button class="btn btn-sm btn-success connect-ssh-server"
                                             data-host="{{ server.host }}"
                                             data-bs-toggle="tooltip" 
@@ -215,6 +221,152 @@ document.addEventListener('DOMContentLoaded', function() {
             performSearch();
         }
     });
+
+    // Test SSH Connection functionality
+    const testButtons = document.querySelectorAll('.test-ssh-connection');
+    testButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const host = this.getAttribute('data-host');
+            const originalContent = this.innerHTML;
+            
+            // Show loading state
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            this.disabled = true;
+            
+            fetch(`/api/test_ssh/${host}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Create modal to show test results
+                    showTestResults(host, data);
+                })
+                .catch(error => {
+                    console.error('Error testing SSH connection:', error);
+                    alert('Error testing SSH connection: ' + error.message);
+                })
+                .finally(() => {
+                    // Restore button state
+                    this.innerHTML = originalContent;
+                    this.disabled = false;
+                });
+        });
+    });
+
+    function showTestResults(host, data) {
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="sshTestModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-vial me-2"></i>SSH Connection Test - ${host}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Status:</strong> 
+                                    <span class="badge ${data.success ? 'bg-success' : 'bg-danger'}">
+                                        ${data.success ? 'Success' : 'Failed'}
+                                    </span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Auth Method:</strong> ${data.auth_method || 'N/A'}
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Hostname:</strong> ${data.hostname}</div>
+                                <div class="col-md-4"><strong>Username:</strong> ${data.username}</div>
+                                <div class="col-md-4"><strong>Port:</strong> ${data.port}</div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>SSH Agent Keys:</strong> ${data.ssh_agent_keys}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Key File:</strong> ${data.key_file || 'Not configured'}
+                                </div>
+                            </div>
+                            
+                            ${data.ssh_agent_fingerprints ? `
+                            <div class="mb-3">
+                                <strong>SSH Agent Key Fingerprints:</strong>
+                                <ul class="list-unstyled ms-3">
+                                    ${data.ssh_agent_fingerprints.map(fp => `<li><code>${fp}</code></li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="mb-3">
+                                <strong>Authentication Methods Tried:</strong>
+                                <ul class="list-unstyled ms-3">
+                                    ${data.auth_methods_tried.map(method => {
+                                        const isSuccess = method.includes('Success');
+                                        const isFailed = method.includes('Failed');
+                                        const badgeClass = isSuccess ? 'bg-success' : isFailed ? 'bg-danger' : 'bg-warning';
+                                        return `<li><span class="badge ${badgeClass} me-2"></span>${method}</li>`;
+                                    }).join('')}
+                                </ul>
+                            </div>
+                            
+                            ${data.connection_error ? `
+                            <div class="alert alert-danger">
+                                <strong>Connection Error:</strong> ${data.connection_error}
+                            </div>
+                            ` : ''}
+                            
+                            ${data.ssh_agent_error ? `
+                            <div class="alert alert-warning">
+                                <strong>SSH Agent Error:</strong> ${data.ssh_agent_error}
+                            </div>
+                            ` : ''}
+                            
+                            ${!data.success ? `
+                            <div class="alert alert-info">
+                                <strong>Troubleshooting Tips:</strong>
+                                <ul class="mb-0">
+                                    <li>Ensure SSH key permissions are correct (600 for private key)</li>
+                                    <li>Check if SSH agent is running: <code>ssh-add -l</code></li>
+                                    <li>Test connection manually: <code>ssh ${host}</code></li>
+                                    <li>Verify server allows your authentication method</li>
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            ${data.success ? `
+                            <button type="button" class="btn btn-success" onclick="window.location.href='/terminal/ssh/${host}'">
+                                <i class="fas fa-terminal me-1"></i>Open Terminal
+                            </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('sshTestModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('sshTestModal'));
+        modal.show();
+        
+        // Clean up when modal is hidden
+        document.getElementById('sshTestModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    }
 });
 </script>
 {% endblock %}
