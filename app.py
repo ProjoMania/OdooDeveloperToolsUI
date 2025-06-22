@@ -196,6 +196,7 @@ def get_ssh_servers():
         user = None
         port = "22"  # Default
         key_file = None
+        password = None
         
         for line in content.splitlines():
             line = line.strip()
@@ -209,6 +210,9 @@ def get_ssh_servers():
                 port = line.split(' ', 1)[1].strip()
             elif line.startswith('IdentityFile '):
                 key_file = line.split(' ', 1)[1].strip()
+            elif line.startswith('# Password:'):
+                # Extract password from comment line
+                password = line.split(':', 1)[1].strip()
         
         if host and hostname:
             servers.append({
@@ -216,7 +220,8 @@ def get_ssh_servers():
                 'hostname': hostname,
                 'user': user or "",
                 'port': port,
-                'key_file': key_file or ""
+                'key_file': key_file or "",
+                'password': password or ""
             })
     
     return servers
@@ -256,6 +261,14 @@ def get_ssh_config(host):
                 key, value = line.split(' ', 1)
                 config[key] = value.strip()
     return config
+
+def check_sshpass_available():
+    """Check if sshpass is available on the system"""
+    try:
+        subprocess.run(['which', 'sshpass'], check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 def create_ssh_client(host):
     """Create and configure SSH client"""
@@ -326,18 +339,32 @@ def ssh_terminal(ws, host):
         hostname = server.get('hostname', host)
         username = server.get('user') or os.getenv('USER', 'root')
         port = int(server.get('port', 22))
+        password = server.get('password', '')
         
         # Send initial connection message
+        auth_method = "password" if password else "key/agent"
         ws.send(json.dumps({
             'type': 'connected',
-            'message': f'Connecting to {hostname} ({host}) as {username}...'
+            'message': f'Connecting to {hostname} ({host}) as {username} using {auth_method}...'
         }))
         
         # Create a pseudo-terminal
         master_fd, slave_fd = pty.openpty()
         
         # Start SSH process using system SSH (which works)
-        ssh_cmd = ['ssh', '-t', host]
+        if password:
+            # Check if sshpass is available
+            if not check_sshpass_available():
+                ws.send(json.dumps({
+                    'type': 'error',
+                    'message': 'Password authentication requires sshpass. Install it with: sudo apt install sshpass'
+                }))
+                return
+            # Use sshpass for password authentication
+            ssh_cmd = ['sshpass', '-p', password, 'ssh', '-t', '-o', 'StrictHostKeyChecking=no', host]
+        else:
+            # Use regular SSH for key-based authentication
+            ssh_cmd = ['ssh', '-t', host]
         
         # Set environment for SSH
         env = os.environ.copy()
@@ -513,17 +540,34 @@ def add_ssh_server_post():
     """Handle SSH server addition"""
     try:
         host = request.form['host']
-        hostname = request.form['hostname']
-        user = request.form['user']
+        hostname = host  # Use host as hostname for simplicity
+        username = request.form['username']
         port = request.form.get('port', '22')
-        key_file = request.form.get('key_file', '~/.ssh/id_rsa')
+        auth_type = request.form.get('auth_type', 'password')
+        password = request.form.get('password', '')
+        key_path = request.form.get('key_path', '')
         
         # Create SSH config
         config_content = f"""Host {host}
     HostName {hostname}
-    User {user}
+    User {username}
     Port {port}
-    IdentityFile {key_file}
+"""
+        
+        # Add authentication specific configuration
+        if auth_type == 'password' and password:
+            config_content += f"""    PreferredAuthentications password
+    PasswordAuthentication yes
+# Password: {password}
+"""
+        elif auth_type == 'key' and key_path:
+            config_content += f"""    IdentityFile {key_path}
+    PreferredAuthentications publickey
+"""
+        else:
+            # Default to key authentication
+            config_content += f"""    IdentityFile ~/.ssh/id_rsa
+    PreferredAuthentications publickey
 """
         
         # Save to config.d directory
@@ -632,9 +676,13 @@ def generate_ssh_command(host):
         username = server.get('user')
         port = server.get('port', '22')
         key_file = server.get('key_file')
+        password = server.get('password')
         
         # Start with basic command
-        command_parts = ['ssh']
+        if password:
+            command_parts = ['sshpass', '-p', password, 'ssh']
+        else:
+            command_parts = ['ssh']
         
         # Add port if not default
         if port and port != '22':
