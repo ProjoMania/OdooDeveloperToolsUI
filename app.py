@@ -668,6 +668,87 @@ def ssh_server_details(host):
     
     return render_template('ssh_server_details.html', server=server, host=host)
 
+@app.route('/servers/edit/<host>')
+def edit_ssh_server(host):
+    """Edit SSH server page"""
+    servers = get_ssh_servers()
+    server = None
+    for s in servers:
+        if s.get('host') == host:
+            server = s
+            break
+    
+    if not server:
+        flash('Server configuration not found', 'error')
+        return redirect(url_for('ssh_servers'))
+    
+    return render_template('ssh_edit.html', server=server, host=host)
+
+@app.route('/servers/edit/<host>', methods=['POST'])
+def edit_ssh_server_post(host):
+    """Handle SSH server edit"""
+    try:
+        servers = get_ssh_servers()
+        server = None
+        for s in servers:
+            if s.get('host') == host:
+                server = s
+                break
+        
+        if not server:
+            flash('Server configuration not found', 'error')
+            return redirect(url_for('ssh_servers'))
+        
+        # Get form data
+        new_host = request.form['host']
+        hostname = request.form.get('hostname', new_host)
+        username = request.form['username']
+        port = request.form.get('port', '22')
+        auth_type = request.form.get('auth_type', 'password')
+        password = request.form.get('password', '')
+        key_path = request.form.get('key_path', '')
+        
+        # Delete old config file if host name changed
+        if new_host != host:
+            old_config_file = os.path.join(SSH_CONFIG_DIR, f"{host}.conf")
+            if os.path.exists(old_config_file):
+                os.remove(old_config_file)
+        
+        # Create updated SSH config
+        config_content = f"""Host {new_host}
+    HostName {hostname}
+    User {username}
+    Port {port}
+"""
+        
+        # Add authentication specific configuration
+        if auth_type == 'password' and password:
+            config_content += f"""    PreferredAuthentications password
+    PasswordAuthentication yes
+# Password: {password}
+"""
+        elif auth_type == 'key' and key_path:
+            config_content += f"""    IdentityFile {key_path}
+    PreferredAuthentications publickey
+"""
+        else:
+            # Default to key authentication
+            config_content += f"""    IdentityFile ~/.ssh/id_rsa
+    PreferredAuthentications publickey
+"""
+        
+        # Save to config.d directory
+        config_file = os.path.join(SSH_CONFIG_DIR, f"{new_host}.conf")
+        with open(config_file, 'w') as f:
+            f.write(config_content)
+        
+        flash(f'SSH server {new_host} updated successfully!', 'success')
+        return redirect(url_for('ssh_servers'))
+        
+    except Exception as e:
+        flash(f'Error updating SSH server: {str(e)}', 'error')
+        return redirect(url_for('edit_ssh_server', host=host))
+
 @app.route('/servers/generate_command/<host>')
 def generate_ssh_command(host):
     """Generate SSH command for copying to clipboard"""
