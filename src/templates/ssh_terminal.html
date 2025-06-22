@@ -11,10 +11,14 @@
                     <h5 class="mb-0">
                         <i class="fas fa-terminal me-2"></i>
                         SSH Terminal - {{ host }}
+                        <span id="connection-status" class="badge bg-warning ms-2">Connecting...</span>
                     </h5>
                     <div>
                         <button class="btn btn-sm btn-outline-secondary me-2" onclick="clearTerminal()">
                             <i class="fas fa-eraser me-1"></i> Clear
+                        </button>
+                        <button class="btn btn-sm btn-outline-info me-2" onclick="reconnect()">
+                            <i class="fas fa-sync-alt me-1"></i> Reconnect
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="disconnect()">
                             <i class="fas fa-power-off me-1"></i> Disconnect
@@ -23,6 +27,18 @@
                 </div>
                 <div class="card-body p-0">
                     <div id="terminal" style="height: 600px; background-color: #1e1e1e;"></div>
+                </div>
+                <div class="card-footer text-muted small">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Server:</strong> {{ server.hostname }} ({{ host }})
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <strong>User:</strong> {{ server.user or 'default' }} | 
+                            <strong>Port:</strong> {{ server.port }} | 
+                            <strong>Auth:</strong> {{ 'SSH Key' if server.key_file else 'Password' }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -39,6 +55,9 @@
     .xterm-viewport {
         overflow-y: auto !important;
     }
+    #connection-status {
+        font-size: 0.7em;
+    }
 </style>
 {% endblock %}
 
@@ -49,6 +68,37 @@
     let term;
     let socket;
     let fitAddon;
+    let isConnected = false;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+
+    function updateConnectionStatus(status, message) {
+        const statusElement = document.getElementById('connection-status');
+        statusElement.className = 'badge ms-2';
+        
+        switch(status) {
+            case 'connecting':
+                statusElement.classList.add('bg-warning');
+                statusElement.textContent = 'Connecting...';
+                break;
+            case 'connected':
+                statusElement.classList.add('bg-success');
+                statusElement.textContent = 'Connected';
+                isConnected = true;
+                reconnectAttempts = 0;
+                break;
+            case 'disconnected':
+                statusElement.classList.add('bg-danger');
+                statusElement.textContent = 'Disconnected';
+                isConnected = false;
+                break;
+            case 'error':
+                statusElement.classList.add('bg-danger');
+                statusElement.textContent = 'Error';
+                isConnected = false;
+                break;
+        }
+    }
 
     function initTerminal() {
         term = new Terminal({
@@ -57,8 +107,20 @@
             fontFamily: 'monospace',
             theme: {
                 background: '#1e1e1e',
-                foreground: '#ffffff'
-            }
+                foreground: '#ffffff',
+                cursor: '#ffffff',
+                selection: '#ffffff40',
+                black: '#000000',
+                red: '#ff5555',
+                green: '#50fa7b',
+                yellow: '#f1fa8c',
+                blue: '#bd93f9',
+                magenta: '#ff79c6',
+                cyan: '#8be9fd',
+                white: '#bfbfbf'
+            },
+            allowTransparency: true,
+            convertEol: true
         });
 
         fitAddon = new FitAddon.FitAddon();
@@ -70,6 +132,23 @@
         // Handle window resize
         window.addEventListener('resize', () => {
             fitAddon.fit();
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'resize',
+                    cols: term.cols,
+                    rows: term.rows
+                }));
+            }
+        });
+
+        // Handle terminal input
+        term.onData(data => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'input',
+                    data: data
+                }));
+            }
         });
 
         // Connect to WebSocket
@@ -77,48 +156,108 @@
     }
 
     function connectWebSocket() {
+        updateConnectionStatus('connecting');
+        
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/ssh/{{ host }}`;
         
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
-            term.writeln('\r\n\x1B[1;32mConnected to {{ host }}\x1B[0m');
-            term.writeln('\r\n');
+            term.writeln('\r\n\x1B[1;36m--- SSH Terminal Started ---\x1B[0m');
+            term.writeln('\x1B[1;33mAttempting to connect to {{ host }}...\x1B[0m\r\n');
         };
 
         socket.onmessage = (event) => {
-            term.write(event.data);
+            try {
+                const data = JSON.parse(event.data);
+                
+                switch(data.type) {
+                    case 'connected':
+                        updateConnectionStatus('connected');
+                        term.writeln(`\r\n\x1B[1;32m✓ ${data.message}\x1B[0m\r\n`);
+                        
+                        // Send initial resize
+                        socket.send(JSON.stringify({
+                            type: 'resize',
+                            cols: term.cols,
+                            rows: term.rows
+                        }));
+                        break;
+                        
+                    case 'output':
+                        term.write(data.data);
+                        break;
+                        
+                    case 'error':
+                        updateConnectionStatus('error');
+                        term.writeln(`\r\n\x1B[1;31m✗ Error: ${data.message}\x1B[0m\r\n`);
+                        break;
+                        
+                    case 'disconnected':
+                        updateConnectionStatus('disconnected');
+                        term.writeln(`\r\n\x1B[1;33m--- ${data.message} ---\x1B[0m\r\n`);
+                        break;
+                }
+            } catch (e) {
+                // Handle plain text messages (for backward compatibility)
+                term.write(event.data);
+            }
         };
 
-        socket.onclose = () => {
-            term.writeln('\r\n\x1B[1;31mDisconnected from {{ host }}\x1B[0m');
+        socket.onclose = (event) => {
+            updateConnectionStatus('disconnected');
+            term.writeln('\r\n\x1B[1;31m--- Connection Closed ---\x1B[0m\r\n');
+            
+            if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                term.writeln(`\x1B[1;33mReconnecting... (${reconnectAttempts}/${maxReconnectAttempts})\x1B[0m\r\n`);
+                setTimeout(() => {
+                    connectWebSocket();
+                }, 2000 * reconnectAttempts);
+            }
         };
 
         socket.onerror = (error) => {
-            term.writeln('\r\n\x1B[1;31mError: ' + error.message + '\x1B[0m');
+            updateConnectionStatus('error');
+            term.writeln('\r\n\x1B[1;31m--- Connection Error ---\x1B[0m\r\n');
+            console.error('WebSocket error:', error);
         };
-
-        // Handle terminal input
-        term.onData(data => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(data);
-            }
-        });
     }
 
     function clearTerminal() {
         term.clear();
     }
 
-    function disconnect() {
+    function reconnect() {
         if (socket) {
             socket.close();
         }
-        window.location.href = '/servers';
+        reconnectAttempts = 0;
+        term.writeln('\r\n\x1B[1;33m--- Reconnecting... ---\x1B[0m\r\n');
+        connectWebSocket();
+    }
+
+    function disconnect() {
+        if (socket) {
+            socket.close(1000); // Normal closure
+        }
+        updateConnectionStatus('disconnected');
+        
+        // Ask user if they want to go back to server list
+        if (confirm('Terminal disconnected. Go back to server list?')) {
+            window.location.href = '/servers';
+        }
     }
 
     // Initialize terminal when page loads
     document.addEventListener('DOMContentLoaded', initTerminal);
+    
+    // Handle page unload
+    window.addEventListener('beforeunload', () => {
+        if (socket) {
+            socket.close();
+        }
+    });
 </script>
 {% endblock %} 
