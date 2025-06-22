@@ -879,8 +879,118 @@ def list_databases():
             databases = []
         else:
             cursor = conn.cursor()
-            cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;")
-            databases = [{'name': row[0]} for row in cursor.fetchall()]
+            cursor.execute("SELECT datname, datdba FROM pg_database WHERE datistemplate = false ORDER BY datname;")
+            db_results = cursor.fetchall()
+            
+            databases = []
+            for db_name, owner_oid in db_results:
+                # Get owner name
+                cursor.execute("SELECT rolname FROM pg_roles WHERE oid = %s;", (owner_oid,))
+                owner_result = cursor.fetchone()
+                owner = owner_result[0] if owner_result else 'Unknown'
+                
+                # Get database size
+                cursor.execute("SELECT pg_size_pretty(pg_database_size(%s));", (db_name,))
+                size_result = cursor.fetchone()
+                db_size = size_result[0] if size_result else 'Unknown'
+                
+                # Try to detect if it's an Odoo database and get version
+                odoo_version = 'Unknown'
+                is_enterprise = False
+                expiration_date = None
+                
+                try:
+                    # Connect to the specific database to check for Odoo tables
+                    db_conn = psycopg2.connect(
+                        dbname=db_name,
+                        user=get_setting('postgres_user', 'postgres'),
+                        password=get_setting('postgres_password', ''),
+                        host=get_setting('postgres_host', '127.0.0.1'),
+                        port=get_setting('postgres_port', '5432')
+                    )
+                    db_cursor = db_conn.cursor()
+                    
+                    # Check if it's an Odoo database by looking for ir_module_module table
+                    db_cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT 1 FROM information_schema.tables 
+                            WHERE table_name = 'ir_module_module'
+                        );
+                    """)
+                    is_odoo = db_cursor.fetchone()[0]
+                    
+                    if is_odoo:
+                        # Get Odoo version from ir_module_module
+                        try:
+                            db_cursor.execute("""
+                                SELECT latest_version FROM ir_module_module 
+                                WHERE name = 'base' AND state = 'installed'
+                                LIMIT 1;
+                            """)
+                            version_result = db_cursor.fetchone()
+                            if version_result and version_result[0]:
+                                # Extract major.minor version (e.g., "17.0.1.0.0" -> "17.0")
+                                full_version = version_result[0]
+                                version_parts = full_version.split('.')
+                                if len(version_parts) >= 2:
+                                    odoo_version = f"{version_parts[0]}.{version_parts[1]}"
+                        except:
+                            odoo_version = 'Odoo DB'
+                        
+                        # Check if it's enterprise by looking for enterprise modules
+                        try:
+                            db_cursor.execute("""
+                                SELECT EXISTS (
+                                    SELECT 1 FROM ir_module_module 
+                                    WHERE name IN ('web_enterprise', 'enterprise_theme') 
+                                    AND state = 'installed'
+                                );
+                            """)
+                            is_enterprise = db_cursor.fetchone()[0]
+                            
+                            # If enterprise, try to get expiration date
+                            if is_enterprise:
+                                try:
+                                    db_cursor.execute("""
+                                        SELECT value FROM ir_config_parameter 
+                                        WHERE key = 'database.expiration_date'
+                                        LIMIT 1;
+                                    """)
+                                    exp_result = db_cursor.fetchone()
+                                    if exp_result and exp_result[0]:
+                                        expiration_date = exp_result[0]
+                                except:
+                                    pass
+                        except:
+                            pass
+                    
+                    db_conn.close()
+                except:
+                    # If we can't connect to the database, it might not be Odoo
+                    pass
+                
+                # Calculate filestore size
+                filestore_size = 'Unknown'
+                try:
+                    filestore_path = os.path.join(FILESTORE_DIR, db_name)
+                    if os.path.exists(filestore_path):
+                        size_bytes = get_dir_size(filestore_path)
+                        filestore_size = format_size(size_bytes)
+                    else:
+                        filestore_size = '0 MB'
+                except:
+                    filestore_size = 'Unknown'
+                
+                databases.append({
+                    'name': db_name,
+                    'owner': owner,
+                    'version': odoo_version,
+                    'size': db_size,
+                    'filestore_size': filestore_size,
+                    'is_enterprise': is_enterprise,
+                    'expiration_date': expiration_date
+                })
+            
             conn.close()
     except Exception as e:
         logger.error(f"Error fetching databases: {str(e)}")
