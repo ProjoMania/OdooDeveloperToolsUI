@@ -1,19 +1,35 @@
-Flask==2.0.1
-Flask-SQLAlchemy==2.5.1
-Flask-Login==0.5.0
+# Core Flask dependencies
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
 Flask-Sock==0.6.0
-requests==2.26.0
+Flask-WTF==1.1.1
+Flask-Migrate==4.0.5
+Werkzeug==2.3.7
+
+# Database
 psycopg2-binary
-paramiko==2.8.1
-python-dotenv>=0.19.0
-Flask-WTF>=0.15.1
-gunicorn>=20.1.0
-Flask-Migrate>=4.0.0
-WTForms>=3.0.0
-markdown==3.4.3
-pytz>=2022.1
-Werkzeug==2.0.1
-eventlet==0.33.0
-sqlalchemy==1.4.23
-cryptography==39.0.2
-importlib-metadata>=6.0.0
+SQLAlchemy==2.0.27
+
+# SSH and networking
+paramiko==3.3.1
+requests==2.31.0
+
+# Security and authentication
+cryptography==41.0.4
+python-dotenv==1.0.0
+
+# File processing
+WTForms==3.0.1
+markdown==3.5.1
+
+# Utilities
+pytz==2023.3
+eventlet==0.33.3
+importlib-metadata==6.8.0
+
+# Development and deployment
+gunicorn==21.2.0
+
+# Type hints support
+typing-extensions==4.8.0

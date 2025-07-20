@@ -31,7 +31,7 @@
                 </div>
             </div>
             <div>
-                <a href="{{ url_for('restore_database') }}" class="btn btn-primary me-2">
+                <a href="{{ url_for('databases.restore_database') }}" class="btn btn-primary me-2">
                     <i class="fas fa-upload me-1"></i> Restore Database
                 </a>
                 <!-- Extend Enterprise button moved to individual database rows -->
@@ -84,7 +84,7 @@
                                 <td class="text-center">
                                     <div class="btn-group" role="group">
                                         {% if db.is_enterprise %}
-                                        <a href="{{ url_for('extend_enterprise', db_name=db.name) }}" 
+                                        <a href="{{ url_for('databases.extend_enterprise', db_name=db.name) }}" 
                                            class="btn btn-sm btn-dark me-1"
                                            data-bs-toggle="tooltip"
                                            title="Extend Enterprise License for {{ db.name }}">
@@ -98,7 +98,7 @@
                                            onclick="prepareMigrationRequest('{{ db.name }}', '{{ db.version }}', {{ db.is_enterprise|lower }})">
                                             <i class="fas fa-exchange-alt"></i>
                                         </button>
-                                        <a href="{{ url_for('drop_database', db_name=db.name) }}" 
+                                        <a href="{{ url_for('databases.drop_database', db_name=db.name) }}" 
                                            class="btn btn-sm btn-danger"
                                            data-bs-toggle="tooltip"
                                            title="Drop {{ db.name }}">

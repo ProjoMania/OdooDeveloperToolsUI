@@ -14,12 +14,12 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{% if project %}Edit{% else %}New{% endif %} Project</h5>
-                <a href="{{ url_for('projects') }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ url_for('projects.projects') }}" class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-arrow-left me-1"></i> Back to Projects
                 </a>
             </div>
             <div class="card-body">
-                <form method="post" action="{{ url_for('edit_project', project_id=project.id) if project else url_for('create_project') }}">
+                <form method="post" action="{{ url_for('projects.edit_project', project_id=project.id) if project else url_for('projects.create_project') }}">
                     <div class="mb-3">
                         <label for="name" class="form-label required">Project Name</label>
                         <input type="text" class="form-control" id="name" name="name" 
@@ -123,7 +123,7 @@
                                             </td>
                                             <td>{{ server.created_at.strftime('%Y-%m-%d') }}</td>
                                             <td class="text-end">
-                                                <form method="post" action="{{ url_for('unlink_server', project_id=project.id, server_id=server.id) }}" class="d-inline">
+                                                <form method="post" action="{{ url_for('projects.unlink_server', project_id=project.id, server_id=server.id) }}" class="d-inline">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" 
                                                             onclick="return confirm('Are you sure you want to unlink this server?')">
                                                         <i class="fas fa-unlink"></i>
@@ -170,7 +170,7 @@
                                             </td>
                                             <td>{{ db.created_at.strftime('%Y-%m-%d') }}</td>
                                             <td class="text-end">
-                                                <form method="post" action="{{ url_for('unlink_database', project_id=project.id, database_id=db.id) }}" class="d-inline">
+                                                <form method="post" action="{{ url_for('projects.unlink_database', project_id=project.id, database_id=db.id) }}" class="d-inline">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger"
                                                             onclick="return confirm('Are you sure you want to unlink this database?')">
                                                         <i class="fas fa-unlink"></i>

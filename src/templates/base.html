@@ -43,22 +43,22 @@
                     </a>
                 </li>
                 <li {% if '/projects' in request.path %}class="active"{% endif %}>
-                    <a href="{{ url_for('projects') }}">
+                    <a href="{{ url_for('projects.projects') }}">
                         <i class="fas fa-project-diagram"></i> <span class="menu-text">Projects</span>
                     </a>
                 </li>
                 <li {% if '/servers' in request.path %}class="active"{% endif %}>
-                    <a href="{{ url_for('ssh_servers') }}">
+                    <a href="{{ url_for('ssh.ssh_servers') }}">
                         <i class="fas fa-terminal"></i> <span class="menu-text">Remote Servers Management</span>
                     </a>
                 </li>
                 <li {% if '/databases' in request.path %}class="active"{% endif %}>
-                    <a href="{{ url_for('list_databases') }}">
+                    <a href="{{ url_for('databases.list_databases') }}">
                         <i class="fas fa-database"></i> <span class="menu-text">Database Management</span>
                     </a>
                 </li>
                 <li {% if '/settings' in request.path %}class="active"{% endif %}>
-                    <a href="{{ url_for('settings') }}">
+                    <a href="{{ url_for('settings.settings') }}">
                         <i class="fas fa-cog"></i> <span class="menu-text">Settings</span>
                     </a>
                 </li>
@@ -94,7 +94,7 @@
                                 <i class="fas fa-user-circle"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog me-2"></i> Settings</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('settings.settings') }}"><i class="fas fa-cog me-2"></i> Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i> Help</a></li>
                             </ul>

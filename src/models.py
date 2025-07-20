@@ -1,4 +1,4 @@
-from src.database import db
+from .database import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
@@ -171,4 +171,4 @@ class OdooInstallation(db.Model):
     user = db.relationship('User', backref=db.backref('odoo_installations', lazy=True))
 
     def __repr__(self):
-        return f'<OdooInstallation {self.id}>'
+        return f'<OdooInstallation {self.id}>' 
