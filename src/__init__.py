@@ -138,6 +138,13 @@ def register_blueprints(app: Flask) -> None:
         app.register_blueprint(settings_bp)
     except ImportError:
         app.logger.warning("Settings blueprint not available")
+    
+    try:
+        from .websocket import websocket_bp, init_websocket
+        init_websocket(app)
+        app.register_blueprint(websocket_bp)
+    except ImportError:
+        app.logger.warning("WebSocket blueprint not available")
 
 def register_template_globals(app: Flask) -> None:
     """Register template global functions"""

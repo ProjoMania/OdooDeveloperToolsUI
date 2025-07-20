@@ -95,7 +95,20 @@ def connect_ssh(host):
         flash(f'SSH configuration not found for host: {host}', 'danger')
         return redirect(url_for('ssh.ssh_servers'))
     
-    return render_template('ssh_connect.html', host=host, server=server_config)
+    # Generate SSH command
+    command_parts = ['ssh']
+    
+    if server_config.get('port', '22') != '22':
+        command_parts.extend(['-p', server_config['port']])
+    
+    if server_config.get('key_file'):
+        command_parts.extend(['-i', server_config['key_file']])
+    
+    command_parts.append(f"{server_config['user']}@{server_config['hostname']}")
+    
+    command = ' '.join(command_parts)
+    
+    return render_template('ssh_connect.html', host=host, server=server_config, command=command)
 
 @ssh_bp.route('/terminal/<host>')
 def ssh_terminal_page(host):

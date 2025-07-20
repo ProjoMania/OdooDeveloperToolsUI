@@ -27,16 +27,16 @@
                                         <strong><i class="fas fa-server me-2" style="color: var(--primary-color);"></i>Server:</strong>
                                     </div>
                                     <div class="col-md-8">
-                                        {{ server_info.hostname|default(command) }}
+                                        {{ server.hostname|default(host) }}
                                     </div>
                                 </div>
-                                {% if server_info.user %}
+                                {% if server.user %}
                                 <div class="row mt-2">
                                     <div class="col-md-4">
                                         <strong><i class="fas fa-user me-2" style="color: var(--primary-color);"></i>User:</strong>
                                     </div>
                                     <div class="col-md-8">
-                                        {{ server_info.user }}
+                                        {{ server.user }}
                                     </div>
                                 </div>
                                 {% endif %}
@@ -45,7 +45,7 @@
                                         <strong><i class="fas fa-key me-2" style="color: var(--primary-color);"></i>Auth Method:</strong>
                                     </div>
                                     <div class="col-md-8">
-                                        {% if server_info.auth_type == 'key' %}
+                                        {% if server.key_file %}
                                             <span class="badge bg-success">SSH Key</span>
                                         {% else %}
                                             <span class="badge bg-primary">Password</span>
@@ -84,7 +84,7 @@
                                         <button class="btn btn-dark copy-ssh-command" data-command="{{ command }}">
                                             <i class="fas fa-copy me-1"></i> Copy SSH Command
                                         </button>
-                                        <a href="{{ url_for('ssh_terminal_page', host=server.host) }}" class="btn btn-primary">
+                                        <a href="{{ url_for('ssh.ssh_terminal_page', host=host) }}" class="btn btn-primary">
                                             <i class="fas fa-terminal me-1"></i> Open Terminal
                                         </a>
                                     </div>
@@ -112,7 +112,7 @@
                 </div>
                 
                 <div class="mt-4 text-center">
-                    <a href="{{ url_for('ssh_servers') }}" class="btn btn-outline-dark">
+                    <a href="{{ url_for('ssh.ssh_servers') }}" class="btn btn-outline-dark">
                         <i class="fas fa-arrow-left me-1"></i> Back to SSH Servers
                     </a>
                 </div>
